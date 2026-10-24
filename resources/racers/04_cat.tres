@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="RacerData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/racer_data.gd" id="1_racer"]
+[ext_resource type="PackedScene" path="res://scenes/racers/cat/model.tscn" id="2_model"]
+[ext_resource type="Script" path="res://scripts/skills/cat_q.gd" id="3_q"]
+[ext_resource type="Script" path="res://scripts/skills/cat_e.gd" id="4_e"]
+
+[resource]
+script = ExtResource("1_racer")
+id = &"cat"
+display_name = "Кіт-буханка"
+bio = "Ідеально сформована буханка. Ковзає на пузі."
+car_color = Color(1.0, 0.55, 0.2, 1)
+model_scene = ExtResource("2_model")
+footprint = Vector2(1.2, 1.9)
+speed = 2
+acceleration = 2
+handling = 3
+weight = 1
+skill_q_name = "Шшш!"
+skill_q_description = "Шипить і відштовхує всіх поруч."
+skill_q_script = ExtResource("3_q")
+skill_e_name = "Коти — рідина"
+skill_e_description = "Протікає на 30 м уперед і 3 с проходить крізь машини."
+skill_e_script = ExtResource("4_e")

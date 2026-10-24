@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="RacerData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/racer_data.gd" id="1_racer"]
+[ext_resource type="PackedScene" path="res://scenes/racers/tractor/model.tscn" id="2_model"]
+[ext_resource type="Script" path="res://scripts/skills/tractor_q.gd" id="3_q"]
+[ext_resource type="Script" path="res://scripts/skills/tractor_e.gd" id="4_e"]
+
+[resource]
+script = ExtResource("1_racer")
+id = &"tractor"
+display_name = "Трактор"
+bio = "Тягне все, що погано лежить."
+car_color = Color(0.25, 0.55, 0.2, 1)
+model_scene = ExtResource("2_model")
+footprint = Vector2(2.3, 3.4)
+speed = 1
+acceleration = 2
+handling = 2
+weight = 3
+skill_q_name = "Буксир"
+skill_q_description = "Чіпляє тросом найближчу машину й 3 с тягне за собою."
+skill_q_script = ExtResource("3_q")
+skill_e_name = "Оранка"
+skill_e_description = "5 с лишає зорану смугу, на якій усі буксують."
+skill_e_script = ExtResource("4_e")

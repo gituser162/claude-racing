@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="RacerData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/racer_data.gd" id="1_racer"]
+
+[resource]
+script = ExtResource("1_racer")
+id = &"storm"
+display_name = "Буревій"
+car_color = Color(0.3, 0.75, 0.9, 1)
+speed = 2
+acceleration = 3
+handling = 1
+weight = 2
+skill_q_name = "Порив"
+skill_q_description = "Штовхає сусідні машини вбік."
+skill_e_name = "Торнадо"
+skill_e_description = "Лишає на трасі вихор, що крутить машини."

@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="RacerData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/racer_data.gd" id="1_racer"]
+[ext_resource type="Script" path="res://scripts/skills/turbo_skill.gd" id="2_turbo"]
+[ext_resource type="Script" path="res://scripts/skills/jet_jump_skill.gd" id="3_jump"]
+[ext_resource type="PackedScene" path="res://scenes/racers/rocket/model.tscn" id="4_model"]
+
+[resource]
+script = ExtResource("1_racer")
+id = &"rocket"
+display_name = "Ракета"
+bio = "Неоновий карт без гальм і без страху."
+model_scene = ExtResource("4_model")
+footprint = Vector2(1.7, 2.9)
+car_color = Color(0.95, 0.25, 0.2, 1)
+speed = 3
+acceleration = 2
+handling = 2
+weight = 1
+skill_q_name = "Турбо"
+skill_q_description = "+50% швидкості на 2 с."
+skill_q_script = ExtResource("2_turbo")
+skill_e_name = "Реактивний стрибок"
+skill_e_description = "Високий стрибок через перешкоди чи зріз."
+skill_e_script = ExtResource("3_jump")

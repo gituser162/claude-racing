@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="RacerData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/racer_data.gd" id="1_racer"]
+
+[resource]
+script = ExtResource("1_racer")
+id = &"ghost"
+display_name = "Привид"
+car_color = Color(0.85, 0.9, 1.0, 1)
+speed = 2
+acceleration = 3
+handling = 2
+weight = 1
+skill_q_name = "Фаза"
+skill_q_description = "2 с проходить крізь машини й атаки."
+skill_e_name = "Телепорт"
+skill_e_description = "Миттєво переносить на ~25 м уперед по трасі."

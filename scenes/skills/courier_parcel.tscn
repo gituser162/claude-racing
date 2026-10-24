@@ -1,0 +1,45 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/skills/hazard.gd" id="1_hazard"]
+[ext_resource type="Shader" path="res://resources/shaders/psx.gdshader" id="2_psx"]
+
+[sub_resource type="BoxShape3D" id="Shape_box"]
+size = Vector3(1.4, 1.2, 1.4)
+
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(0.9, 0.7, 0.9)
+
+[sub_resource type="BoxMesh" id="Mesh_tape"]
+size = Vector3(0.92, 0.72, 0.15)
+
+[sub_resource type="ShaderMaterial" id="Mat_box"]
+render_priority = 0
+shader = ExtResource("2_psx")
+shader_parameter/albedo = Color(0.5, 0.35, 0.18, 1)
+
+[sub_resource type="ShaderMaterial" id="Mat_tape"]
+render_priority = 0
+shader = ExtResource("2_psx")
+shader_parameter/albedo = Color(0.85, 0.7, 0.2, 1)
+shader_parameter/emission = Color(0.9, 0.7, 0.1, 1)
+shader_parameter/emission_energy = 0.6
+
+[node name="Parcel" type="Area3D"]
+script = ExtResource("1_hazard")
+strength = 0.45
+duration = 1.5
+lifetime = 15.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+shape = SubResource("Shape_box")
+
+[node name="Box" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
+mesh = SubResource("Mesh_box")
+surface_material_override/0 = SubResource("Mat_box")
+
+[node name="Tape" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.35, 0)
+mesh = SubResource("Mesh_tape")
+surface_material_override/0 = SubResource("Mat_tape")

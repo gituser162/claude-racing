@@ -1,0 +1,167 @@
+[gd_scene format=3]
+
+[ext_resource type="Shader" path="res://resources/shaders/psx.gdshader" id="2_psx"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_chassis"]
+size = Vector3(1.5, 0.35, 2.6)
+
+[sub_resource type="BoxMesh" id="BoxMesh_nose"]
+size = Vector3(1.1, 0.25, 0.7)
+
+[sub_resource type="BoxMesh" id="BoxMesh_seat"]
+size = Vector3(0.9, 0.55, 0.8)
+
+[sub_resource type="BoxMesh" id="BoxMesh_spoiler"]
+size = Vector3(1.6, 0.1, 0.45)
+
+[sub_resource type="BoxMesh" id="BoxMesh_strut"]
+size = Vector3(0.1, 0.35, 0.1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_spoke"]
+size = Vector3(0.36, 0.1, 0.56)
+
+[sub_resource type="BoxMesh" id="BoxMesh_headlight"]
+size = Vector3(0.28, 0.1, 0.05)
+
+[sub_resource type="BoxMesh" id="BoxMesh_taillight"]
+size = Vector3(0.4, 0.1, 0.05)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_wheel"]
+top_radius = 0.35
+bottom_radius = 0.35
+height = 0.32
+radial_segments = 8
+rings = 1
+
+[sub_resource type="ShaderMaterial" id="Mat_dark"]
+render_priority = 0
+shader = ExtResource("2_psx")
+shader_parameter/albedo = Color(0.06, 0.06, 0.07, 1)
+shader_parameter/emission = Color(0, 0, 0, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="ShaderMaterial" id="Mat_metal"]
+render_priority = 0
+shader = ExtResource("2_psx")
+shader_parameter/albedo = Color(0.35, 0.35, 0.38, 1)
+shader_parameter/emission = Color(0, 0, 0, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="ShaderMaterial" id="Mat_headlight"]
+render_priority = 0
+shader = ExtResource("2_psx")
+shader_parameter/albedo = Color(1, 1, 0.9, 1)
+shader_parameter/emission = Color(1, 0.95, 0.8, 1)
+shader_parameter/emission_energy = 3.0
+
+[sub_resource type="ShaderMaterial" id="Mat_taillight"]
+render_priority = 0
+shader = ExtResource("2_psx")
+shader_parameter/albedo = Color(0.6, 0, 0, 1)
+shader_parameter/emission = Color(1, 0.05, 0.05, 1)
+shader_parameter/emission_energy = 3.0
+
+[node name="Model" type="Node3D"]
+
+[node name="Chassis" type="MeshInstance3D" parent="." groups=["paint"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.42, 0)
+mesh = SubResource("BoxMesh_chassis")
+
+[node name="Nose" type="MeshInstance3D" parent="." groups=["paint"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.38, -1.6)
+mesh = SubResource("BoxMesh_nose")
+
+[node name="Seat" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0.35)
+mesh = SubResource("BoxMesh_seat")
+surface_material_override/0 = SubResource("Mat_dark")
+
+[node name="Spoiler" type="MeshInstance3D" parent="." groups=["paint"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0, 1.2)
+mesh = SubResource("BoxMesh_spoiler")
+
+[node name="StrutL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0.78, 1.2)
+mesh = SubResource("BoxMesh_strut")
+surface_material_override/0 = SubResource("Mat_dark")
+
+[node name="StrutR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.78, 1.2)
+mesh = SubResource("BoxMesh_strut")
+surface_material_override/0 = SubResource("Mat_dark")
+
+[node name="HeadlightL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, 0.4, -1.96)
+mesh = SubResource("BoxMesh_headlight")
+surface_material_override/0 = SubResource("Mat_headlight")
+
+[node name="HeadlightR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 0.4, -1.96)
+mesh = SubResource("BoxMesh_headlight")
+surface_material_override/0 = SubResource("Mat_headlight")
+
+[node name="TaillightL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0.48, 1.31)
+mesh = SubResource("BoxMesh_taillight")
+surface_material_override/0 = SubResource("Mat_taillight")
+
+[node name="TaillightR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.48, 1.31)
+mesh = SubResource("BoxMesh_taillight")
+surface_material_override/0 = SubResource("Mat_taillight")
+
+[node name="WheelFL" type="Node3D" parent="." groups=["steer"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.88, 0.35, -0.85)
+
+[node name="Spin" type="Node3D" parent="WheelFL" groups=["spin"]]
+
+[node name="Tire" type="MeshInstance3D" parent="WheelFL/Spin"]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("CylinderMesh_wheel")
+surface_material_override/0 = SubResource("Mat_dark")
+
+[node name="Spoke" type="MeshInstance3D" parent="WheelFL/Spin"]
+mesh = SubResource("BoxMesh_spoke")
+surface_material_override/0 = SubResource("Mat_metal")
+
+[node name="WheelFR" type="Node3D" parent="." groups=["steer"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.88, 0.35, -0.85)
+
+[node name="Spin" type="Node3D" parent="WheelFR" groups=["spin"]]
+
+[node name="Tire" type="MeshInstance3D" parent="WheelFR/Spin"]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("CylinderMesh_wheel")
+surface_material_override/0 = SubResource("Mat_dark")
+
+[node name="Spoke" type="MeshInstance3D" parent="WheelFR/Spin"]
+mesh = SubResource("BoxMesh_spoke")
+surface_material_override/0 = SubResource("Mat_metal")
+
+[node name="WheelRL" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.88, 0.35, 0.9)
+
+[node name="Spin" type="Node3D" parent="WheelRL" groups=["spin"]]
+
+[node name="Tire" type="MeshInstance3D" parent="WheelRL/Spin"]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("CylinderMesh_wheel")
+surface_material_override/0 = SubResource("Mat_dark")
+
+[node name="Spoke" type="MeshInstance3D" parent="WheelRL/Spin"]
+mesh = SubResource("BoxMesh_spoke")
+surface_material_override/0 = SubResource("Mat_metal")
+
+[node name="WheelRR" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.88, 0.35, 0.9)
+
+[node name="Spin" type="Node3D" parent="WheelRR" groups=["spin"]]
+
+[node name="Tire" type="MeshInstance3D" parent="WheelRR/Spin"]
+transform = Transform3D(0, -1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("CylinderMesh_wheel")
+surface_material_override/0 = SubResource("Mat_dark")
+
+[node name="Spoke" type="MeshInstance3D" parent="WheelRR/Spin"]
+mesh = SubResource("BoxMesh_spoke")
+surface_material_override/0 = SubResource("Mat_metal")

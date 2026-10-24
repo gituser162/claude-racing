@@ -1,0 +1,180 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/race/track.gd" id="1_track"]
+[ext_resource type="Shader" path="res://resources/shaders/grid.gdshader" id="2_grid"]
+[ext_resource type="Shader" path="res://resources/shaders/psx.gdshader" id="4_psx"]
+[ext_resource type="Texture2D" path="res://assets/textures/asphalt.png" id="5_asphalt"]
+[ext_resource type="Texture2D" path="res://assets/textures/lane_dash.png" id="6_dash"]
+[ext_resource type="Texture2D" path="res://assets/textures/metal_panel.png" id="7_metal"]
+
+[sub_resource type="Curve3D" id="Curve3D_track"]
+bake_interval = 0.5
+_data = {
+"points": PackedVector3Array(0.333, -0, 22.5, -0.333, 0, -22.5, 0, 0, 0, -0, -0, 28.333, 0, 0, -28.333, 0, 0, -90, -5, -0.167, 24.167, 5, 0.167, -24.167, 0, 0, -170, -17.5, -0.5, 15.333, 17.5, 0.5, -15.333, 30, 1, -235, -26.667, -0.833, 1.667, 26.667, 0.833, -1.667, 105, 3, -262, -25, -0, -11.167, 25, 0, 11.167, 190, 6, -245, -13.667, 0.833, -20, 13.667, -0.833, 20, 255, 3, -195, -2.167, 0.5, -23.333, 2.167, -0.5, 23.333, 272, 1, -125, 3.667, 0.167, -17.833, -3.667, -0.167, 17.833, 268, 0, -55, 7.667, -0, -4.167, -7.667, 0, 4.167, 250, 0, -18, 6.333, -0, 12, -6.333, 0, -12, 222, 0, -30, 4.333, -0, 19.667, -4.333, 0, -19.667, 212, 0, -90, 10.333, -0, 11.667, -10.333, 0, -11.667, 196, 0, -148, 13, -0, -3.833, -13, 0, 3.833, 150, 0, -160, 6.667, -0, -16.667, -6.667, 0, 16.667, 118, 0, -125, 2.167, -0, -22.5, -2.167, 0, 22.5, 110, 0, -60, 5, -0, -20.333, -5, 0, 20.333, 105, 0, 10, 12.5, -0, -10.333, -12.5, 0, 10.333, 80, 0, 62, 13, -0, 2.833, -13, 0, -2.833, 30, 0, 72, 5, -0, 12, -5, 0, -12, 2, 0, 45, 0.333, -0, 22.5, -0.333, 0, -22.5, 0, 0, 0),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 21
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ground"]
+render_priority = 0
+shader = ExtResource("2_grid")
+shader_parameter/color_a = Color(0.07, 0.07, 0.09, 1)
+shader_parameter/color_b = Color(0.1, 0.09, 0.12, 1)
+shader_parameter/cell_size = 16.0
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_startline"]
+render_priority = 0
+shader = ExtResource("2_grid")
+shader_parameter/color_a = Color(0.8, 0.8, 0.8, 1)
+shader_parameter/color_b = Color(0.05, 0.05, 0.05, 1)
+shader_parameter/cell_size = 1.0
+
+[sub_resource type="ShaderMaterial" id="Mat_road"]
+render_priority = 0
+shader = ExtResource("4_psx")
+shader_parameter/albedo = Color(0.42, 0.4, 0.46, 1)
+shader_parameter/albedo_texture = ExtResource("5_asphalt")
+shader_parameter/uv_scale = Vector2(1, 10)
+shader_parameter/emission = Color(0, 0, 0, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="ShaderMaterial" id="Mat_kerb_left"]
+render_priority = 0
+shader = ExtResource("4_psx")
+shader_parameter/albedo = Color(0.0, 0.3, 0.35, 1)
+shader_parameter/emission = Color(0.1, 0.9, 1.0, 1)
+shader_parameter/emission_energy = 2.0
+
+[sub_resource type="ShaderMaterial" id="Mat_kerb_right"]
+render_priority = 0
+shader = ExtResource("4_psx")
+shader_parameter/albedo = Color(0.35, 0.0, 0.25, 1)
+shader_parameter/emission = Color(1.0, 0.15, 0.7, 1)
+shader_parameter/emission_energy = 2.0
+
+[sub_resource type="ShaderMaterial" id="Mat_lane"]
+render_priority = 0
+shader = ExtResource("4_psx")
+shader_parameter/albedo = Color(0.75, 0.75, 0.7, 1)
+shader_parameter/albedo_texture = ExtResource("6_dash")
+shader_parameter/uv_scale = Vector2(1, 1)
+shader_parameter/affine_strength = 0.0
+
+[sub_resource type="ShaderMaterial" id="Mat_post"]
+render_priority = 0
+shader = ExtResource("4_psx")
+shader_parameter/albedo = Color(0.12, 0.12, 0.14, 1)
+shader_parameter/emission = Color(0, 0, 0, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="ShaderMaterial" id="Mat_banner"]
+render_priority = 0
+shader = ExtResource("4_psx")
+shader_parameter/albedo = Color(0.4, 0.0, 0.25, 1)
+shader_parameter/emission = Color(1.0, 0.15, 0.7, 1)
+shader_parameter/emission_energy = 1.5
+
+[sub_resource type="ShaderMaterial" id="Mat_ramp"]
+render_priority = 0
+shader = ExtResource("4_psx")
+shader_parameter/albedo = Color(0.35, 0.28, 0.05, 1)
+shader_parameter/emission = Color(1.0, 0.75, 0.1, 1)
+shader_parameter/emission_energy = 1.2
+
+[node name="TestTrack" type="Node3D"]
+script = ExtResource("1_track")
+
+[node name="CityFloor" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 135, -40.5, -95)
+size = Vector3(900, 1, 900)
+material = SubResource("ShaderMaterial_ground")
+
+[node name="TrackPath" type="Path3D" parent="."]
+curve = SubResource("Curve3D_track")
+
+[node name="Road" type="CSGPolygon3D" parent="."]
+polygon = PackedVector2Array(-7, 0, 7, 0, 7, -6, -7, -6)
+mode = 2
+path_node = NodePath("../TrackPath")
+path_interval_type = 0
+path_interval = 2.0
+path_simplify_angle = 0.0
+path_rotation = 2
+path_local = false
+path_continuous_u = true
+path_u_distance = 4.0
+path_joined = true
+use_collision = true
+material = SubResource("Mat_road")
+
+[node name="LaneCenter" type="CSGPolygon3D" parent="."]
+polygon = PackedVector2Array(-0.15, 0.015, 0.15, 0.015, 0.15, -0.05, -0.15, -0.05)
+mode = 2
+path_node = NodePath("../TrackPath")
+path_interval_type = 0
+path_interval = 2.0
+path_simplify_angle = 0.0
+path_rotation = 2
+path_local = false
+path_continuous_u = true
+path_u_distance = 6.0
+path_joined = true
+material = SubResource("Mat_lane")
+
+[node name="KerbLeft" type="CSGPolygon3D" parent="."]
+polygon = PackedVector2Array(-7.6, 0.02, -7, 0.02, -7, -0.5, -7.6, -0.5)
+mode = 2
+path_node = NodePath("../TrackPath")
+path_interval_type = 0
+path_interval = 2.0
+path_simplify_angle = 0.0
+path_rotation = 2
+path_local = false
+path_continuous_u = true
+path_u_distance = 1.0
+path_joined = true
+use_collision = true
+material = SubResource("Mat_kerb_left")
+
+[node name="KerbRight" type="CSGPolygon3D" parent="."]
+polygon = PackedVector2Array(7, 0.02, 7.6, 0.02, 7.6, -0.5, 7, -0.5)
+mode = 2
+path_node = NodePath("../TrackPath")
+path_interval_type = 0
+path_interval = 2.0
+path_simplify_angle = 0.0
+path_rotation = 2
+path_local = false
+path_continuous_u = true
+path_u_distance = 1.0
+path_joined = true
+use_collision = true
+material = SubResource("Mat_kerb_right")
+
+[node name="StartLine" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01, 0)
+size = Vector3(14, 0.04, 2)
+material = SubResource("ShaderMaterial_startline")
+
+[node name="GantryLeft" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.5, 3.5, 0)
+use_collision = true
+size = Vector3(0.8, 7, 0.8)
+material = SubResource("Mat_post")
+
+[node name="GantryRight" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.5, 3.5, 0)
+use_collision = true
+size = Vector3(0.8, 7, 0.8)
+material = SubResource("Mat_post")
+
+[node name="GantryBanner" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 7.2, 0)
+size = Vector3(20, 1.4, 0.6)
+material = SubResource("Mat_banner")
+
+[node name="Ramp" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.966, 0.259, 0, -0.259, 0.966, 108.6, 0.78, -25)
+use_collision = true
+size = Vector3(6, 0.5, 8)
+material = SubResource("Mat_ramp")

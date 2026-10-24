@@ -1,0 +1,209 @@
+[gd_scene format=3]
+
+[ext_resource type="Shader" path="res://resources/shaders/psx.gdshader" id="1_psx"]
+
+[sub_resource type="BoxMesh" id="Mesh_0"]
+size = Vector3(1, 0.68, 1.45)
+
+[sub_resource type="ShaderMaterial" id="Mat_0"]
+render_priority = 0
+shader = ExtResource("1_psx")
+shader_parameter/albedo = Color(0.85, 0.45, 0.15, 1)
+shader_parameter/emission = Color(0, 0, 0, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="BoxMesh" id="Mesh_1"]
+size = Vector3(0.8, 0.15, 1.3)
+
+[sub_resource type="BoxMesh" id="Mesh_2"]
+size = Vector3(0.84, 0.04, 0.14)
+
+[sub_resource type="ShaderMaterial" id="Mat_1"]
+render_priority = 0
+shader = ExtResource("1_psx")
+shader_parameter/albedo = Color(0.5, 0.22, 0.06, 1)
+shader_parameter/emission = Color(0, 0, 0, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="BoxMesh" id="Mesh_3"]
+size = Vector3(0.03, 0.35, 0.12)
+
+[sub_resource type="BoxMesh" id="Mesh_4"]
+size = Vector3(0.14, 0.12, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_5"]
+size = Vector3(0.14, 0.12, 0.35)
+
+[sub_resource type="BoxMesh" id="Mesh_6"]
+size = Vector3(0.18, 0.1, 0.16)
+
+[sub_resource type="ShaderMaterial" id="Mat_2"]
+render_priority = 0
+shader = ExtResource("1_psx")
+shader_parameter/albedo = Color(0.9, 0.88, 0.85, 1)
+shader_parameter/emission = Color(0, 0, 0, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="BoxMesh" id="Mesh_7"]
+size = Vector3(0.72, 0.55, 0.55)
+
+[sub_resource type="BoxMesh" id="Mesh_8"]
+size = Vector3(0.4, 0.22, 0.1)
+
+[sub_resource type="CylinderMesh" id="Mesh_9"]
+top_radius = 0.0
+bottom_radius = 0.14
+height = 0.25
+radial_segments = 4
+rings = 1
+
+[sub_resource type="BoxMesh" id="Mesh_10"]
+size = Vector3(0.14, 0.09, 0.03)
+
+[sub_resource type="ShaderMaterial" id="Mat_3"]
+render_priority = 0
+shader = ExtResource("1_psx")
+shader_parameter/albedo = Color(0.2, 0.6, 0.1, 1)
+shader_parameter/emission = Color(0.4, 1, 0.3, 1)
+shader_parameter/emission_energy = 2.5
+
+[sub_resource type="BoxMesh" id="Mesh_11"]
+size = Vector3(0.08, 0.06, 0.03)
+
+[sub_resource type="ShaderMaterial" id="Mat_4"]
+render_priority = 0
+shader = ExtResource("1_psx")
+shader_parameter/albedo = Color(0.85, 0.45, 0.5, 1)
+shader_parameter/emission = Color(0, 0, 0, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="BoxMesh" id="Mesh_12"]
+size = Vector3(0.4, 0.012, 0.012)
+
+[node name="Model" type="Node3D"]
+
+[node name="Body" type="MeshInstance3D" parent="." groups=["paint"]]
+position = Vector3(0, 0.4, 0.1)
+mesh = SubResource("Mesh_0")
+surface_material_override/0 = SubResource("Mat_0")
+
+[node name="Back" type="MeshInstance3D" parent="." groups=["paint"]]
+position = Vector3(0, 0.81, 0.1)
+mesh = SubResource("Mesh_1")
+surface_material_override/0 = SubResource("Mat_0")
+
+[node name="Stripe0" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.9, -0.35)
+mesh = SubResource("Mesh_2")
+surface_material_override/0 = SubResource("Mat_1")
+
+[node name="SideStripeL0" type="MeshInstance3D" parent="."]
+position = Vector3(-0.51, 0.55, -0.35)
+mesh = SubResource("Mesh_3")
+surface_material_override/0 = SubResource("Mat_1")
+
+[node name="SideStripeR0" type="MeshInstance3D" parent="."]
+position = Vector3(0.51, 0.55, -0.35)
+mesh = SubResource("Mesh_3")
+surface_material_override/0 = SubResource("Mat_1")
+
+[node name="Stripe1" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.9, 0.05)
+mesh = SubResource("Mesh_2")
+surface_material_override/0 = SubResource("Mat_1")
+
+[node name="SideStripeL1" type="MeshInstance3D" parent="."]
+position = Vector3(-0.51, 0.55, 0.05)
+mesh = SubResource("Mesh_3")
+surface_material_override/0 = SubResource("Mat_1")
+
+[node name="SideStripeR1" type="MeshInstance3D" parent="."]
+position = Vector3(0.51, 0.55, 0.05)
+mesh = SubResource("Mesh_3")
+surface_material_override/0 = SubResource("Mat_1")
+
+[node name="Stripe2" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.9, 0.45)
+mesh = SubResource("Mesh_2")
+surface_material_override/0 = SubResource("Mat_1")
+
+[node name="SideStripeL2" type="MeshInstance3D" parent="."]
+position = Vector3(-0.51, 0.55, 0.45)
+mesh = SubResource("Mesh_3")
+surface_material_override/0 = SubResource("Mat_1")
+
+[node name="SideStripeR2" type="MeshInstance3D" parent="."]
+position = Vector3(0.51, 0.55, 0.45)
+mesh = SubResource("Mesh_3")
+surface_material_override/0 = SubResource("Mat_1")
+
+[node name="Tail" type="MeshInstance3D" parent="." groups=["paint"]]
+position = Vector3(0.56, 0.12, 0.2)
+mesh = SubResource("Mesh_4")
+surface_material_override/0 = SubResource("Mat_0")
+
+[node name="TailTip" type="MeshInstance3D" parent="."]
+position = Vector3(0.42, 0.12, -0.38)
+rotation = Vector3(0, 0.6, 0)
+mesh = SubResource("Mesh_5")
+surface_material_override/0 = SubResource("Mat_1")
+
+[node name="PawL" type="MeshInstance3D" parent="."]
+position = Vector3(-0.2, 0.05, -0.66)
+mesh = SubResource("Mesh_6")
+surface_material_override/0 = SubResource("Mat_2")
+
+[node name="PawR" type="MeshInstance3D" parent="."]
+position = Vector3(0.2, 0.05, -0.66)
+mesh = SubResource("Mesh_6")
+surface_material_override/0 = SubResource("Mat_2")
+
+[node name="HeadPivot" type="Node3D" parent="." groups=["steer"]]
+position = Vector3(0, 0.55, -0.7)
+
+[node name="Head" type="MeshInstance3D" parent="HeadPivot" groups=["paint"]]
+position = Vector3(0, 0.15, -0.1)
+mesh = SubResource("Mesh_7")
+surface_material_override/0 = SubResource("Mat_0")
+
+[node name="Muzzle" type="MeshInstance3D" parent="HeadPivot"]
+position = Vector3(0, 0.04, -0.4)
+mesh = SubResource("Mesh_8")
+surface_material_override/0 = SubResource("Mat_2")
+
+[node name="EarL" type="MeshInstance3D" parent="HeadPivot" groups=["paint"]]
+position = Vector3(-0.22, 0.52, -0.1)
+rotation = Vector3(0, 0.7854, 0)
+mesh = SubResource("Mesh_9")
+surface_material_override/0 = SubResource("Mat_0")
+
+[node name="EarR" type="MeshInstance3D" parent="HeadPivot" groups=["paint"]]
+position = Vector3(0.22, 0.52, -0.1)
+rotation = Vector3(0, 0.7854, 0)
+mesh = SubResource("Mesh_9")
+surface_material_override/0 = SubResource("Mat_0")
+
+[node name="EyeL" type="MeshInstance3D" parent="HeadPivot"]
+position = Vector3(-0.17, 0.24, -0.38)
+mesh = SubResource("Mesh_10")
+surface_material_override/0 = SubResource("Mat_3")
+
+[node name="EyeR" type="MeshInstance3D" parent="HeadPivot"]
+position = Vector3(0.17, 0.24, -0.38)
+mesh = SubResource("Mesh_10")
+surface_material_override/0 = SubResource("Mat_3")
+
+[node name="Nose" type="MeshInstance3D" parent="HeadPivot"]
+position = Vector3(0, 0.12, -0.46)
+mesh = SubResource("Mesh_11")
+surface_material_override/0 = SubResource("Mat_4")
+
+[node name="WhiskerL" type="MeshInstance3D" parent="HeadPivot"]
+position = Vector3(-0.36, 0.06, -0.44)
+mesh = SubResource("Mesh_12")
+surface_material_override/0 = SubResource("Mat_2")
+
+[node name="WhiskerR" type="MeshInstance3D" parent="HeadPivot"]
+position = Vector3(0.36, 0.06, -0.44)
+mesh = SubResource("Mesh_12")
+surface_material_override/0 = SubResource("Mat_2")

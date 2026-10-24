@@ -1,0 +1,91 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/car/car.gd" id="1_car"]
+[ext_resource type="Shader" path="res://resources/shaders/psx.gdshader" id="2_psx"]
+[ext_resource type="Shader" path="res://resources/shaders/psx_glow.gdshader" id="3_glow"]
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_ball"]
+friction = 0.0
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_ball"]
+radius = 0.5
+
+[sub_resource type="BoxMesh" id="BoxMesh_exhaust"]
+size = Vector3(0.7, 0.3, 0.9)
+
+[sub_resource type="BoxMesh" id="BoxMesh_jet"]
+size = Vector3(1.2, 0.12, 2.0)
+
+[sub_resource type="ShaderMaterial" id="Mat_flame"]
+render_priority = 0
+shader = ExtResource("2_psx")
+shader_parameter/albedo = Color(1, 0.5, 0.1, 1)
+shader_parameter/emission = Color(1, 0.55, 0.15, 1)
+shader_parameter/emission_energy = 4.0
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_glow"]
+size = Vector2(1.3, 2.4)
+
+[sub_resource type="ShaderMaterial" id="Mat_underglow"]
+render_priority = 0
+shader = ExtResource("2_psx")
+shader_parameter/albedo = Color(0, 0, 0, 1)
+shader_parameter/emission = Color(0.1, 0.9, 1.0, 1)
+shader_parameter/emission_energy = 2.0
+
+[sub_resource type="SphereMesh" id="SphereMesh_shield"]
+radius = 1.0
+height = 2.0
+radial_segments = 10
+rings = 5
+
+[sub_resource type="ShaderMaterial" id="Mat_shield"]
+render_priority = 0
+shader = ExtResource("3_glow")
+
+[node name="Car" type="Node3D"]
+script = ExtResource("1_car")
+
+[node name="Ball" type="RigidBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+collision_layer = 2
+collision_mask = 1
+mass = 140.0
+physics_material_override = SubResource("PhysicsMaterial_ball")
+gravity_scale = 2.2
+lock_rotation = true
+continuous_cd = true
+can_sleep = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ball"]
+shape = SubResource("SphereShape3D_ball")
+
+[node name="GroundRay" type="RayCast3D" parent="Ball"]
+target_position = Vector3(0, -1.2, 0)
+
+[node name="Body" type="Node3D" parent="."]
+
+[node name="Model" type="Node3D" parent="Body"]
+
+[node name="Underglow" type="MeshInstance3D" parent="Body/Model"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.06, 0)
+mesh = SubResource("PlaneMesh_glow")
+surface_material_override/0 = SubResource("Mat_underglow")
+
+[node name="Exhaust" type="MeshInstance3D" parent="Body/Model"]
+visible = false
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 1.75)
+mesh = SubResource("BoxMesh_exhaust")
+surface_material_override/0 = SubResource("Mat_flame")
+
+[node name="JetFlame" type="MeshInstance3D" parent="Body/Model"]
+visible = false
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+mesh = SubResource("BoxMesh_jet")
+surface_material_override/0 = SubResource("Mat_flame")
+
+[node name="Shield" type="MeshInstance3D" parent="Body"]
+visible = false
+transform = Transform3D(1.3, 0, 0, 0, 0.9, 0, 0, 0, 1.9, 0, 0.8, 0)
+mesh = SubResource("SphereMesh_shield")
+surface_material_override/0 = SubResource("Mat_shield")

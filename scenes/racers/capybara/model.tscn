@@ -1,0 +1,266 @@
+[gd_scene format=3]
+
+[ext_resource type="Shader" path="res://resources/shaders/psx.gdshader" id="1_psx"]
+
+[sub_resource type="BoxMesh" id="Mesh_0"]
+size = Vector3(1.4, 0.65, 2.1)
+
+[sub_resource type="ShaderMaterial" id="Mat_0"]
+render_priority = 0
+shader = ExtResource("1_psx")
+shader_parameter/albedo = Color(0.85, 0.85, 0.82, 1)
+shader_parameter/emission = Color(0, 0, 0, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="BoxMesh" id="Mesh_1"]
+size = Vector3(1.5, 0.08, 2.2)
+
+[sub_resource type="BoxMesh" id="Mesh_2"]
+size = Vector3(1.22, 0.04, 1.92)
+
+[sub_resource type="ShaderMaterial" id="Mat_1"]
+render_priority = 0
+shader = ExtResource("1_psx")
+shader_parameter/albedo = Color(0.15, 0.35, 0.5, 1)
+shader_parameter/emission = Color(0.1, 0.35, 0.5, 1)
+shader_parameter/emission_energy = 0.7
+
+[sub_resource type="BoxMesh" id="Mesh_3"]
+size = Vector3(0.75, 0.45, 1)
+
+[sub_resource type="ShaderMaterial" id="Mat_2"]
+render_priority = 0
+shader = ExtResource("1_psx")
+shader_parameter/albedo = Color(0.45, 0.3, 0.18, 1)
+shader_parameter/emission = Color(0, 0, 0, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="BoxMesh" id="Mesh_4"]
+size = Vector3(0.16, 0.14, 0.2)
+
+[sub_resource type="ShaderMaterial" id="Mat_3"]
+render_priority = 0
+shader = ExtResource("1_psx")
+shader_parameter/albedo = Color(0.9, 0.8, 0.1, 1)
+shader_parameter/emission = Color(0, 0, 0, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="BoxMesh" id="Mesh_5"]
+size = Vector3(0.06, 0.04, 0.07)
+
+[sub_resource type="ShaderMaterial" id="Mat_4"]
+render_priority = 0
+shader = ExtResource("1_psx")
+shader_parameter/albedo = Color(0.9, 0.45, 0.08, 1)
+shader_parameter/emission = Color(0, 0, 0, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="CylinderMesh" id="Mesh_6"]
+top_radius = 0.04
+bottom_radius = 0.04
+height = 0.4
+radial_segments = 6
+rings = 1
+
+[sub_resource type="ShaderMaterial" id="Mat_5"]
+render_priority = 0
+shader = ExtResource("1_psx")
+shader_parameter/albedo = Color(0.5, 0.5, 0.55, 1)
+shader_parameter/emission = Color(0, 0, 0, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="BoxMesh" id="Mesh_7"]
+size = Vector3(0.06, 0.06, 0.25)
+
+[sub_resource type="BoxMesh" id="Mesh_8"]
+size = Vector3(0.55, 0.45, 0.7)
+
+[sub_resource type="BoxMesh" id="Mesh_9"]
+size = Vector3(0.45, 0.32, 0.2)
+
+[sub_resource type="ShaderMaterial" id="Mat_6"]
+render_priority = 0
+shader = ExtResource("1_psx")
+shader_parameter/albedo = Color(0.32, 0.2, 0.12, 1)
+shader_parameter/emission = Color(0, 0, 0, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="BoxMesh" id="Mesh_10"]
+size = Vector3(0.2, 0.06, 0.03)
+
+[sub_resource type="ShaderMaterial" id="Mat_7"]
+render_priority = 0
+shader = ExtResource("1_psx")
+shader_parameter/albedo = Color(0.06, 0.06, 0.07, 1)
+shader_parameter/emission = Color(0, 0, 0, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="BoxMesh" id="Mesh_11"]
+size = Vector3(0.06, 0.05, 0.03)
+
+[sub_resource type="BoxMesh" id="Mesh_12"]
+size = Vector3(0.1, 0.1, 0.06)
+
+[sub_resource type="SphereMesh" id="Mesh_13"]
+radius = 0.12
+height = 0.24
+radial_segments = 6
+rings = 3
+
+[sub_resource type="ShaderMaterial" id="Mat_8"]
+render_priority = 0
+shader = ExtResource("1_psx")
+shader_parameter/albedo = Color(0.9, 0.5, 0.1, 1)
+shader_parameter/emission = Color(0, 0, 0, 1)
+shader_parameter/emission_energy = 0.0
+
+[sub_resource type="CylinderMesh" id="Mesh_14"]
+top_radius = 0.18
+bottom_radius = 0.18
+height = 0.12
+radial_segments = 8
+rings = 1
+
+[sub_resource type="BoxMesh" id="Mesh_15"]
+size = Vector3(0.1344, 0.0504, 0.288)
+
+[node name="Model" type="Node3D"]
+
+[node name="Tub" type="MeshInstance3D" parent="." groups=["paint"]]
+position = Vector3(0, 0.55, 0)
+mesh = SubResource("Mesh_0")
+surface_material_override/0 = SubResource("Mat_0")
+
+[node name="Rim" type="MeshInstance3D" parent="." groups=["paint"]]
+position = Vector3(0, 0.9, 0)
+mesh = SubResource("Mesh_1")
+surface_material_override/0 = SubResource("Mat_0")
+
+[node name="Water" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.9, 0)
+mesh = SubResource("Mesh_2")
+surface_material_override/0 = SubResource("Mat_1")
+
+[node name="CapyBody" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1, 0.25)
+mesh = SubResource("Mesh_3")
+surface_material_override/0 = SubResource("Mat_2")
+
+[node name="Duck" type="MeshInstance3D" parent="."]
+position = Vector3(0.42, 0.98, 0.65)
+mesh = SubResource("Mesh_4")
+surface_material_override/0 = SubResource("Mat_3")
+
+[node name="DuckBeak" type="MeshInstance3D" parent="."]
+position = Vector3(0.42, 1, 0.52)
+mesh = SubResource("Mesh_5")
+surface_material_override/0 = SubResource("Mat_4")
+
+[node name="Faucet" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.1, 1)
+mesh = SubResource("Mesh_6")
+surface_material_override/0 = SubResource("Mat_5")
+
+[node name="Spout" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.28, 0.9)
+mesh = SubResource("Mesh_7")
+surface_material_override/0 = SubResource("Mat_5")
+
+[node name="HeadPivot" type="Node3D" parent="." groups=["steer"]]
+position = Vector3(0, 1.15, -0.3)
+
+[node name="Head" type="MeshInstance3D" parent="HeadPivot"]
+position = Vector3(0, 0.05, -0.25)
+mesh = SubResource("Mesh_8")
+surface_material_override/0 = SubResource("Mat_2")
+
+[node name="Snout" type="MeshInstance3D" parent="HeadPivot"]
+position = Vector3(0, -0.02, -0.68)
+mesh = SubResource("Mesh_9")
+surface_material_override/0 = SubResource("Mat_6")
+
+[node name="Nose" type="MeshInstance3D" parent="HeadPivot"]
+position = Vector3(0, 0.08, -0.79)
+mesh = SubResource("Mesh_10")
+surface_material_override/0 = SubResource("Mat_7")
+
+[node name="EyeL" type="MeshInstance3D" parent="HeadPivot"]
+position = Vector3(-0.2, 0.18, -0.5)
+mesh = SubResource("Mesh_11")
+surface_material_override/0 = SubResource("Mat_7")
+
+[node name="EyeR" type="MeshInstance3D" parent="HeadPivot"]
+position = Vector3(0.2, 0.18, -0.5)
+mesh = SubResource("Mesh_11")
+surface_material_override/0 = SubResource("Mat_7")
+
+[node name="EarL" type="MeshInstance3D" parent="HeadPivot"]
+position = Vector3(-0.2, 0.32, -0.05)
+mesh = SubResource("Mesh_12")
+surface_material_override/0 = SubResource("Mat_6")
+
+[node name="EarR" type="MeshInstance3D" parent="HeadPivot"]
+position = Vector3(0.2, 0.32, -0.05)
+mesh = SubResource("Mesh_12")
+surface_material_override/0 = SubResource("Mat_6")
+
+[node name="Yuzu" type="MeshInstance3D" parent="HeadPivot"]
+position = Vector3(0, 0.39, -0.2)
+mesh = SubResource("Mesh_13")
+surface_material_override/0 = SubResource("Mat_8")
+
+[node name="WheelFL" type="Node3D" parent="." groups=["steer"]]
+position = Vector3(-0.55, 0.18, -0.75)
+
+[node name="Spin" type="Node3D" parent="WheelFL" groups=["spin"]]
+
+[node name="Tire" type="MeshInstance3D" parent="WheelFL/Spin"]
+rotation = Vector3(0, 0, 1.5708)
+mesh = SubResource("Mesh_14")
+surface_material_override/0 = SubResource("Mat_7")
+
+[node name="Spoke" type="MeshInstance3D" parent="WheelFL/Spin"]
+mesh = SubResource("Mesh_15")
+surface_material_override/0 = SubResource("Mat_5")
+
+[node name="WheelFR" type="Node3D" parent="." groups=["steer"]]
+position = Vector3(0.55, 0.18, -0.75)
+
+[node name="Spin" type="Node3D" parent="WheelFR" groups=["spin"]]
+
+[node name="Tire" type="MeshInstance3D" parent="WheelFR/Spin"]
+rotation = Vector3(0, 0, 1.5708)
+mesh = SubResource("Mesh_14")
+surface_material_override/0 = SubResource("Mat_7")
+
+[node name="Spoke" type="MeshInstance3D" parent="WheelFR/Spin"]
+mesh = SubResource("Mesh_15")
+surface_material_override/0 = SubResource("Mat_5")
+
+[node name="WheelRL" type="Node3D" parent="."]
+position = Vector3(-0.55, 0.18, 0.75)
+
+[node name="Spin" type="Node3D" parent="WheelRL" groups=["spin"]]
+
+[node name="Tire" type="MeshInstance3D" parent="WheelRL/Spin"]
+rotation = Vector3(0, 0, 1.5708)
+mesh = SubResource("Mesh_14")
+surface_material_override/0 = SubResource("Mat_7")
+
+[node name="Spoke" type="MeshInstance3D" parent="WheelRL/Spin"]
+mesh = SubResource("Mesh_15")
+surface_material_override/0 = SubResource("Mat_5")
+
+[node name="WheelRR" type="Node3D" parent="."]
+position = Vector3(0.55, 0.18, 0.75)
+
+[node name="Spin" type="Node3D" parent="WheelRR" groups=["spin"]]
+
+[node name="Tire" type="MeshInstance3D" parent="WheelRR/Spin"]
+rotation = Vector3(0, 0, 1.5708)
+mesh = SubResource("Mesh_14")
+surface_material_override/0 = SubResource("Mat_7")
+
+[node name="Spoke" type="MeshInstance3D" parent="WheelRR/Spin"]
+mesh = SubResource("Mesh_15")
+surface_material_override/0 = SubResource("Mat_5")

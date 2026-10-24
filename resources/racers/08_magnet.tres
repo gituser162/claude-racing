@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="RacerData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/racer_data.gd" id="1_racer"]
+
+[resource]
+script = ExtResource("1_racer")
+id = &"magnet"
+display_name = "Магніт"
+car_color = Color(0.85, 0.3, 0.6, 1)
+speed = 2
+acceleration = 2
+handling = 1
+weight = 3
+skill_q_name = "Притягнення"
+skill_q_description = "Тягне себе до машини попереду."
+skill_e_name = "Обмін"
+skill_e_description = "Міняється місцями з машиною попереду."

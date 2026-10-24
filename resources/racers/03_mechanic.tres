@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="RacerData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/racer_data.gd" id="1_racer"]
+
+[resource]
+script = ExtResource("1_racer")
+id = &"mechanic"
+display_name = "Механік"
+car_color = Color(0.95, 0.7, 0.15, 1)
+speed = 2
+acceleration = 2
+handling = 2
+weight = 2
+skill_q_name = "Мастило"
+skill_q_description = "Калюжа позаду: хто наїде — ковзає."
+skill_e_name = "Міна"
+skill_e_description = "Ставить міну, вибух підкидає машину."

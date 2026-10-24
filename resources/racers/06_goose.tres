@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="RacerData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/racer_data.gd" id="1_racer"]
+[ext_resource type="PackedScene" path="res://scenes/racers/goose/model.tscn" id="2_model"]
+[ext_resource type="Script" path="res://scripts/skills/goose_q.gd" id="3_q"]
+[ext_resource type="Script" path="res://scripts/skills/goose_e.gd" id="4_e"]
+
+[resource]
+script = ExtResource("1_racer")
+id = &"goose"
+display_name = "Гусак"
+bio = "Найнебезпечніший учасник. Шипить на всіх."
+car_color = Color(0.95, 0.95, 0.9, 1)
+model_scene = ExtResource("2_model")
+footprint = Vector2(1.0, 1.7)
+speed = 3
+acceleration = 2
+handling = 2
+weight = 1
+skill_q_name = "Щипок"
+skill_q_description = "Щипає машину попереду — та розкручується."
+skill_q_script = ExtResource("3_q")
+skill_e_name = "Ключ гусей"
+skill_e_description = "Зграя летить уздовж траси й розкручує всіх попереду."
+skill_e_script = ExtResource("4_e")

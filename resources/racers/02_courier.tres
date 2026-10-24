@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="RacerData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/racer_data.gd" id="1_racer"]
+[ext_resource type="PackedScene" path="res://scenes/racers/courier/model.tscn" id="2_model"]
+[ext_resource type="Script" path="res://scripts/skills/courier_q.gd" id="3_q"]
+[ext_resource type="Script" path="res://scripts/skills/courier_e.gd" id="4_e"]
+
+[resource]
+script = ExtResource("1_racer")
+id = &"courier"
+display_name = "Кур'єр «Швидка Пошта»"
+bio = "Посилки доставляє завжди. Іноді навіть вчасно."
+car_color = Color(0.95, 0.75, 0.12, 1)
+model_scene = ExtResource("2_model")
+footprint = Vector2(2.2, 4.4)
+speed = 2
+acceleration = 1
+handling = 2
+weight = 3
+skill_q_name = "Посилка"
+skill_q_description = "Скидає коробку на трасу позаду: хто врізається — гальмує."
+skill_q_script = ExtResource("3_q")
+skill_e_name = "Черга у відділенні"
+skill_e_description = "Усі суперники попереду в радіусі 40 м 3 с повзуть, як у черзі."
+skill_e_script = ExtResource("4_e")

@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="RacerData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/racer_data.gd" id="1_racer"]
+[ext_resource type="PackedScene" path="res://scenes/racers/marshrutka/model.tscn" id="2_model"]
+[ext_resource type="Script" path="res://scripts/skills/marshrutka_q.gd" id="3_q"]
+[ext_resource type="Script" path="res://scripts/skills/marshrutka_e.gd" id="4_e"]
+
+[resource]
+script = ExtResource("1_racer")
+id = &"marshrutka"
+display_name = "Маршрутка № 13"
+bio = "Ще один влізе. Завжди."
+car_color = Color(1.0, 0.85, 0.25, 1)
+model_scene = ExtResource("2_model")
+footprint = Vector2(2.2, 5.0)
+speed = 2
+acceleration = 2
+handling = 1
+weight = 3
+skill_q_name = "Передайте за проїзд"
+skill_q_description = "Сповільнює машину попереду і сама прискорюється."
+skill_q_script = ExtResource("3_q")
+skill_e_name = "Ще один влізе"
+skill_e_description = "6 с утричі важча й не піддається скілам — таранить усіх."
+skill_e_script = ExtResource("4_e")

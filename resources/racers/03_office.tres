@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="RacerData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/racer_data.gd" id="1_racer"]
+[ext_resource type="PackedScene" path="res://scenes/racers/office/model.tscn" id="2_model"]
+[ext_resource type="Script" path="res://scripts/skills/office_q.gd" id="3_q"]
+[ext_resource type="Script" path="res://scripts/skills/office_e.gd" id="4_e"]
+
+[resource]
+script = ExtResource("1_racer")
+id = &"office"
+display_name = "Офісний планктон"
+bio = "Втік з наради на кріслі. Обіцяв повернутись до дедлайну."
+car_color = Color(0.22, 0.28, 0.5, 1)
+model_scene = ExtResource("2_model")
+footprint = Vector2(1.3, 1.6)
+speed = 2
+acceleration = 3
+handling = 2
+weight = 1
+top_speed_multiplier = 0.94
+skill_q_name = "Кава"
+skill_q_description = "Турбо на 2 с."
+skill_q_script = ExtResource("3_q")
+skill_e_name = "Дедлайн"
+skill_e_description = "4 с шаленої швидкості, але кермо «ватне»."
+skill_e_script = ExtResource("4_e")

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="RacerData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/racer_data.gd" id="1_racer"]
+
+[resource]
+script = ExtResource("1_racer")
+id = &"armor"
+display_name = "Броня"
+car_color = Color(0.45, 0.5, 0.55, 1)
+speed = 2
+acceleration = 1
+handling = 2
+weight = 3
+skill_q_name = "Щит"
+skill_q_description = "Блокує наступну атаку (до 5 с)."
+skill_e_name = "Таран"
+skill_e_description = "Ривок уперед, що відкидає суперників."

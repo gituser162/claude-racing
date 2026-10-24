@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="RacerData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/racer_data.gd" id="1_racer"]
+[ext_resource type="PackedScene" path="res://scenes/racers/capybara/model.tscn" id="2_model"]
+[ext_resource type="Script" path="res://scripts/skills/capybara_q.gd" id="3_q"]
+[ext_resource type="Script" path="res://scripts/skills/capybara_e.gd" id="4_e"]
+
+[resource]
+script = ExtResource("1_racer")
+id = &"capybara"
+display_name = "Капібара у ванні"
+bio = "Спокійна. Дуже спокійна. З апельсином на голові."
+car_color = Color(0.95, 0.95, 0.92, 1)
+model_scene = ExtResource("2_model")
+footprint = Vector2(1.6, 2.3)
+speed = 2
+acceleration = 2
+handling = 2
+weight = 2
+skill_q_name = "Спокій"
+skill_q_description = "3 с ніщо не може її потурбувати."
+skill_q_script = ExtResource("3_q")
+skill_e_name = "Ok I pull up"
+skill_e_description = "Телепортується впритул за машину попереду."
+skill_e_script = ExtResource("4_e")
