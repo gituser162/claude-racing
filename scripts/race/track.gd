@@ -59,6 +59,8 @@ const NEON_COLORS: Array[Color] = [
 	Color(0.6, 0.3, 1.0), Color(1.0, 0.35, 0.25),
 ]
 
+## Місця для білбордів на фасадах (для вуличних мап): {transform, side, max_height}.
+var _facade_spots: Array[Dictionary] = []
 var curve: Curve3D
 var length: float
 
@@ -368,6 +370,14 @@ func _spawn_frontage() -> void:
 			if not corners_ok:
 				continue
 			var size := Vector3(depth, rng.randf_range(16.0, 55.0), width)
+			# Широкий фасад — місце для білборда (рамка 11,8 м), щоб він не стирчав за межі будинку.
+			if width >= 14.0 and size.y >= 20.0:
+				_facade_spots.append({
+					# Точка на 0,6 м перед фасадом (з боку дороги), на рівні землі.
+					"transform": Transform3D(t.basis, pos - t.basis.x * side * (depth * 0.5 + 0.6)),
+					"side": side,
+					"max_height": size.y - 4.0,
+				})
 			var building := MeshInstance3D.new()
 			building.mesh = box
 			building.material_override = building_mat
@@ -506,24 +516,37 @@ func _spawn_billboards() -> void:
 	holder.name = "Billboards"
 	add_child(holder)
 	var count := int(length / billboard_spacing)
+	# На вуличних мапах білборди висять на фасадах будинків (обличчям до вулиці, без опори):
+	# окремо стоячий білборд застрягав би наполовину в будинках.
+	var on_facades := frontage_buildings and not _facade_spots.is_empty()
 	for i: int in count:
-		var offset := (i + 0.3) * length / count
+		var t: Transform3D
 		var side := 1.0 if i % 2 == 0 else -1.0
-		var t := get_transform_at(offset, side * billboard_lateral, 9.0 + rng.randf() * 6.0)
+		if on_facades:
+			var spot: Dictionary = _facade_spots[int((i + 0.3) * _facade_spots.size() / count) % _facade_spots.size()]
+			side = spot.side
+			t = spot.transform
+			t.origin.y += minf(10.0 + rng.randf() * 6.0, spot.max_height)
+			# Обличчям (+Z) — до дороги, площиною вздовж фасаду.
+			t.basis = t.basis.rotated(Vector3.UP, -side * PI * 0.5)
+		else:
+			var offset := (i + 0.3) * length / count
+			t = get_transform_at(offset, side * billboard_lateral, 9.0 + rng.randf() * 6.0)
+			# Обличчям (+Z) — назустріч гонщикам і трохи до дороги.
+			t.basis = t.basis.rotated(Vector3.UP, side * 0.35)
 		if _in_keep_clear(t.origin, 8.0):
 			continue
-		# Обличчям (+Z) — назустріч гонщикам і трохи до дороги.
-		t.basis = t.basis.rotated(Vector3.UP, side * 0.35)
 		var board := Node3D.new()
 		board.transform = t
 		var color := NEON_COLORS[rng.randi() % NEON_COLORS.size()]
 		# Шари рознесені: рамка позаду панелі, текст помітно перед нею.
 		_add_mesh(board, frame_mesh, _psx_material(color * 0.3, color, 2.0, false), Vector3(0, 0, -0.5))
 		_add_mesh(board, panel_mesh, panel_mat, Vector3.ZERO)
-		var pole := _add_mesh(board, pole_mesh, pole_mat, Vector3(0, 0, -0.9))
-		var pole_height := t.origin.y - city_floor_y
-		pole.scale.y = pole_height
-		pole.position.y = -pole_height * 0.5
+		if not on_facades:
+			var pole := _add_mesh(board, pole_mesh, pole_mat, Vector3(0, 0, -0.9))
+			var pole_height := t.origin.y - city_floor_y
+			pole.scale.y = pole_height
+			pole.position.y = -pole_height * 0.5
 		var label := Label3D.new()
 		label.text = ADS[i % ADS.size()]
 		label.font_size = 80
