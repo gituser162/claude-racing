@@ -8,6 +8,9 @@ signal checkpoint_passed(car: Car, index: int)
 
 @export var checkpoint_count: int = 16
 @export var road_width: float = 14.0
+## true — естакада над містом (опори, місто внизу, з траси можна впасти);
+## false — вулиця на рівні землі (без опор, місто навколо траси).
+@export var elevated: bool = true
 
 @export_group("Місто")
 @export var city_seed: int = 7
@@ -21,8 +24,20 @@ signal checkpoint_passed(car: Car, index: int)
 @export var pillar_spacing: float = 30.0
 @export var arch_spacing: float = 160.0
 @export var billboard_spacing: float = 115.0
+## Відстань білбордів від центру дороги, м.
+@export var billboard_lateral: float = 19.0
+## Будинки «фасадом» уздовж обох боків траси (як на справжній вулиці).
+@export var frontage_buildings: bool = false
+## Ширина тротуару між краєм дороги й фасадами, м.
+@export var sidewalk_width: float = 5.0
+## Зони без забудови: (x, z, радіус) — наприклад, площа всередині повороту.
+@export var keep_clear: PackedVector3Array = PackedVector3Array()
 
 @export_group("Бар'єри")
+## SHARP_CORNERS — лише із зовнішнього боку крутих поворотів (естакада);
+## FULL — суцільна стіна з обох боків уздовж усієї траси (вулиця, відбійники).
+enum BarrierMode { SHARP_CORNERS, FULL }
+@export var barrier_mode: BarrierMode = BarrierMode.SHARP_CORNERS
 ## Бар'єри ставляться із зовнішнього боку поворотів, крутіших за цей радіус, м.
 @export var barrier_max_radius: float = 45.0
 ## Запас бар'єра до й після крутої ділянки, м.
@@ -54,15 +69,26 @@ func _ready() -> void:
 	curve = path.curve
 	length = curve.get_baked_length()
 	_build_checkpoints()
+	if frontage_buildings:
+		_spawn_frontage()
 	_spawn_city()
-	_spawn_pillars()
+	if elevated:
+		_spawn_pillars()
 	_spawn_lamps()
-	_spawn_barriers()
+	if barrier_mode == BarrierMode.FULL:
+		_spawn_full_barriers()
+	else:
+		_spawn_barriers()
 	_spawn_arches()
 	_spawn_billboards()
 	var traffic: Node3D = load("res://scripts/race/sky_traffic.gd").new()
 	traffic.name = "SkyTraffic"
 	add_child(traffic)
+	# Особливі місця конкретної мапи (тунель, площа тощо) — дочірні вузли з методом build_features.
+	# Викликаємо тут, а не в їхньому _ready: тоді крива траси ще не готова.
+	for child: Node in get_children():
+		if child.has_method(&"build_features"):
+			child.build_features(self)
 
 
 ## Точка на центрі дороги через `offset` метрів від старту, повернута за ходом руху.
@@ -140,12 +166,15 @@ func _spawn_city() -> void:
 		var pos := city_area.position + Vector3(
 			rng.randf() * city_area.size.x, 0.0, rng.randf() * city_area.size.z)
 		var free_radius := road_width * 0.5 + street_margin + maxf(size.x, size.z) * 0.71
-		if _distance_to_road(pos) < free_radius:
+		if _distance_to_road(pos) < free_radius or _in_keep_clear(pos, maxf(size.x, size.z) * 0.71):
 			continue
 		# Що далі від траси, то вищі будинки — виходить «стіна» міста на горизонті.
 		var far := clampf((_distance_to_road(pos) - free_radius) / 120.0, 0.0, 1.0)
 		# Висота рахується від землі міста (вона на city_floor_y під трасою).
-		size.y = -city_floor_y + rng.randf_range(-15.0, 30.0) + far * rng.randf_range(20.0, 110.0)
+		if elevated:
+			size.y = -city_floor_y + rng.randf_range(-15.0, 30.0) + far * rng.randf_range(20.0, 110.0)
+		else:
+			size.y = rng.randf_range(14.0, 45.0) + far * rng.randf_range(20.0, 90.0)
 		pos.y = city_floor_y
 		var building := MeshInstance3D.new()
 		building.mesh = box
@@ -305,6 +334,111 @@ func _spawn_barriers() -> void:
 			wall.add_child(collider)
 
 
+## Будинки-фасади вздовж обох боків траси: «каньйон» вулиці.
+func _spawn_frontage() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = city_seed + 11
+	var box := BoxMesh.new()
+	var building_mat := ShaderMaterial.new()
+	building_mat.shader = BUILDING_SHADER
+	var sign_mats: Array[ShaderMaterial] = []
+	for color: Color in NEON_COLORS:
+		sign_mats.append(_psx_material(color * 0.3, color, 2.5, false))
+	var holder := Node3D.new()
+	holder.name = "Frontage"
+	add_child(holder)
+	var edge := road_width * 0.5 + sidewalk_width
+	for side: float in [-1.0, 1.0]:
+		var offset := 0.0
+		while offset < length:
+			var width := rng.randf_range(12.0, 24.0)
+			var depth := rng.randf_range(12.0, 22.0)
+			var t := get_transform_at(offset + width * 0.5, side * (edge + depth * 0.5))
+			offset += width + rng.randf_range(0.0, 4.0)
+			var pos := t.origin
+			# Не на дорозі (крутий поворот) і не на площах.
+			if _distance_to_road(pos) < edge + minf(width, depth) * 0.5 - 0.5 or _in_keep_clear(pos, maxf(width, depth) * 0.6):
+				continue
+			var corners_ok := true
+			for cx: float in [-0.5, 0.5]:
+				for cz: float in [-0.5, 0.5]:
+					var corner := t * Vector3(cx * depth, 0.0, cz * width)
+					if _distance_to_road(corner) < edge - 0.5:
+						corners_ok = false
+			if not corners_ok:
+				continue
+			var size := Vector3(depth, rng.randf_range(16.0, 55.0), width)
+			var building := MeshInstance3D.new()
+			building.mesh = box
+			building.material_override = building_mat
+			building.transform = Transform3D(t.basis.scaled(size), pos + Vector3.UP * (size.y * 0.5 - 0.05))
+			holder.add_child(building)
+			if rng.randf() < 0.45:
+				_add_sign(holder, Vector3(pos.x, 0.0, pos.z), Vector3(minf(width, depth), size.y, minf(width, depth)), sign_mats[rng.randi() % sign_mats.size()], rng)
+
+
+func _in_keep_clear(pos: Vector3, radius: float) -> bool:
+	for area: Vector3 in keep_clear:
+		if Vector2(pos.x - area.x, pos.z - area.y).length() < area.z + radius:
+			return true
+	return false
+
+
+## Суцільні відбійники з обох боків уздовж усієї траси (режим FULL).
+## Видима стіна — неперервна CSG-смуга вздовж кривої (гладка на поворотах),
+## зіткнення — короткі коробки-сегменти, як і в режимі SHARP_CORNERS (див. Car._check_barriers).
+func _spawn_full_barriers() -> void:
+	var holder := Node3D.new()
+	holder.name = "Barriers"
+	add_child(holder)
+	var concrete := _psx_material(Color(0.32, 0.31, 0.34))
+	var inner := road_width * 0.5
+	for side: float in [-1.0, 1.0]:
+		var neon := NEON_COLORS[1] if side < 0.0 else NEON_COLORS[0]
+		var neon_mat := _psx_material(neon * 0.4, neon, 2.4, false)
+		neon_mat.set_shader_parameter(&"detail_strength", 0.0)
+		var a := inner * side
+		var b := (inner + 0.45) * side
+		_add_path_strip(holder, PackedVector2Array([Vector2(a, 0.95), Vector2(b, 0.95), Vector2(b, -0.3), Vector2(a, -0.3)]), concrete)
+		_add_path_strip(holder, PackedVector2Array([Vector2(a - 0.02 * side, 0.85), Vector2(b + 0.02 * side, 0.85), Vector2(b + 0.02 * side, 0.7), Vector2(a - 0.02 * side, 0.7)]), neon_mat)
+		var wall := StaticBody3D.new()
+		wall.name = "Barrier"
+		wall.collision_layer = BARRIER_LAYER
+		wall.collision_mask = 0
+		wall.add_to_group(&"barrier")
+		holder.add_child(wall)
+		var offset := 0.0
+		while offset < length:
+			# На поворотах сегменти коротші — стіна майже гладка.
+			var step := 1.5 if _turn_at(offset).x < 80.0 else 3.0
+			var shape := BoxShape3D.new()
+			shape.size = Vector3(0.6, 1.4, step + 0.1)
+			var collider := CollisionShape3D.new()
+			collider.shape = shape
+			collider.transform = get_transform_at(offset + step * 0.5, side * (inner + 0.25), 0.7)
+			wall.add_child(collider)
+			offset += step
+
+
+## Смуга заданого перерізу (x — убік від центру, y — висота) уздовж усієї кривої траси.
+func _add_path_strip(parent: Node3D, profile: PackedVector2Array, material: Material) -> CSGPolygon3D:
+	var strip := CSGPolygon3D.new()
+	strip.polygon = profile
+	strip.mode = CSGPolygon3D.MODE_PATH
+	parent.add_child(strip)
+	strip.path_node = strip.get_path_to(path)
+	strip.path_interval_type = CSGPolygon3D.PATH_INTERVAL_DISTANCE
+	strip.path_interval = 1.5
+	strip.path_simplify_angle = 0.0
+	strip.path_rotation = CSGPolygon3D.PATH_ROTATION_PATH_FOLLOW
+	strip.path_local = false
+	strip.path_continuous_u = true
+	strip.path_u_distance = 4.0
+	strip.path_joined = true
+	strip.material = material
+	return strip
+
+
 ## Опори під естакадою — від низу дороги до землі міста.
 func _spawn_pillars() -> void:
 	var mesh := BoxMesh.new()
@@ -375,7 +509,9 @@ func _spawn_billboards() -> void:
 	for i: int in count:
 		var offset := (i + 0.3) * length / count
 		var side := 1.0 if i % 2 == 0 else -1.0
-		var t := get_transform_at(offset, side * 19.0, 9.0 + rng.randf() * 6.0)
+		var t := get_transform_at(offset, side * billboard_lateral, 9.0 + rng.randf() * 6.0)
+		if _in_keep_clear(t.origin, 8.0):
+			continue
 		# Обличчям (+Z) — назустріч гонщикам і трохи до дороги.
 		t.basis = t.basis.rotated(Vector3.UP, side * 0.35)
 		var board := Node3D.new()

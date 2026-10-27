@@ -25,6 +25,7 @@ const RACER_PATHS: PackedStringArray = [
 ## Теж шляхи, а не preload — з тієї ж причини, що й у гонщиків.
 const MAP_PATHS: PackedStringArray = [
 	"res://resources/maps/01_neon_overpass.tres",
+	"res://resources/maps/02_city_street.tres",
 ]
 
 var RACERS: Array[RacerData] = []

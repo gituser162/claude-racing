@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="MapData" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/map_data.gd" id="1_map"]
+
+[resource]
+script = ExtResource("1_map")
+id = &"city_street"
+display_name = "Міська вулиця"
+description = "Тісні квартали, 16 поворотів — без заносу тут не проїхати."
+scene_path = "res://scenes/track/city_street.tscn"
