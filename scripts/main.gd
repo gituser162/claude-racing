@@ -220,6 +220,32 @@ func _physics_process(delta: float) -> void:
 	_dynamics.update(delta, _cars, _car, _progress, _is_finished)
 
 
+## Машини між камерою й машиною гравця стають напівпрозорими, щоб велика модель
+## (фургон, маршрутка, трактор) не закривала маленького гонщика й трасу.
+const SEE_THROUGH_AMOUNT: float = 0.65
+const SEE_THROUGH_SPEED: float = 6.0
+
+
+func _update_see_through(delta: float) -> void:
+	var camera: Camera3D = $ChaseCamera
+	var from := camera.global_position
+	var to := _car.body.global_position + Vector3.UP * 0.8
+	var line := to - from
+	var length_sq := maxf(line.length_squared(), 0.01)
+	for car: Car in _cars:
+		if car == _car:
+			continue
+		var pos := car.body.global_position + Vector3.UP * 0.8
+		var t := clampf((pos - from).dot(line) / length_sq, 0.0, 1.0)
+		var closest := from + line * t
+		# Радіус «загородження» — половина більшого розміру моделі плюс запас.
+		var radius := maxf(car.footprint.x, car.footprint.y) * 0.5 + 0.4
+		# Між камерою й гравцем — або камера взагалі всередині цієї машини.
+		var blocking := t < 1.0 and pos.distance_to(closest) < radius
+		var target := SEE_THROUGH_AMOUNT if blocking else 0.0
+		car.set_see_through(move_toward(car._see_through, target, SEE_THROUGH_SPEED * delta))
+
+
 func _is_finished(car: Car) -> bool:
 	var state: CarRaceState = _states[car]
 	return state.finished
@@ -238,6 +264,7 @@ func _check_wrong_way(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	_update_hud()
+	_update_see_through(delta)
 	if _message_timer > 0.0:
 		_message_timer -= delta
 		if _message_timer <= 0.0:

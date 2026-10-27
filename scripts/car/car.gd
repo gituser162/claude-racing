@@ -106,6 +106,10 @@ var _steer_left: float = 0.0
 var _steer_multiplier: float = 1.0
 var _base_mass: float = 100.0
 var _model_instance: Node3D
+## Наскільки модель зараз прозора (0 — звичайна). Див. set_see_through.
+var _see_through: float = 0.0
+## Власні копії матеріалів моделі для прозорості (щоб не зачепити інші об'єкти з тим самим матеріалом).
+var _see_materials: Array[ShaderMaterial] = []
 var _front_wheels: Array[Node3D] = []
 var _wheel_spins: Array[Node3D] = []
 var _paint_meshes: Array[MeshInstance3D] = []
@@ -129,6 +133,11 @@ var _scrape_normal: Vector3
 var _sparks: CPUParticles3D
 ## Іскри ще трохи сиплються після останнього дотику, щоб не мерехтіли.
 var _spark_hold: float = 0.0
+## Плавний розворот після удару об стіну задом/боком: цільовий курс і чи триває розворот.
+var _swing_target: float = 0.0
+var _swinging: bool = false
+## Швидкість такого розвороту (рад/с): 180° приблизно за 0,5 с.
+const SWING_RATE: float = 6.5
 ## Швидкість кулі до кроку фізики: сигнал зіткнення приходить уже після удару.
 var _prev_velocity: Vector3 = Vector3.ZERO
 var _is_player_car: bool = false
@@ -218,6 +227,8 @@ func _load_model(scene: PackedScene) -> void:
 		_model_instance.queue_free()
 	_model_instance = scene.instantiate()
 	_model.add_child(_model_instance)
+	_see_materials.clear()
+	_see_through = 0.0
 	_front_wheels.clear()
 	_wheel_spins.clear()
 	_paint_meshes.clear()
@@ -367,22 +378,65 @@ func _on_barrier_hit(along: Vector3, normal: Vector3) -> void:
 	if velocity.dot(along) < 0.0:
 		along = -along
 	var tangent_heading := atan2(-along.x, -along.z)
+	# Наскільки ніс машини відвернутий від напрямку руху вздовж стіни.
+	var misalign := absf(angle_difference(_heading, tangent_heading))
 	if _barrier_cooldown > 0.0:
-		# Продовжуємо тертись об стіну: машина плавно йде вздовж неї, як по напрямній.
+		# Продовжуємо тертись об стіну: машина йде вздовж неї, як по напрямній.
 		_barrier_cooldown = 0.5
-		_heading = lerp_angle(_heading, tangent_heading, 0.25)
+		if _swinging or misalign > deg_to_rad(20.0):
+			_start_swing(tangent_heading)
 		return
 	var impact := absf(velocity.dot(normal))
 	_barrier_cooldown = 0.5
+	if misalign > deg_to_rad(20.0):
+		# Машина повернута до стіни під кутом, боком чи задом (часто в заносі): без ривка —
+		# плавно розвертається носом за рухом і ковзає далі, зберігаючи швидкість.
+		_start_swing(tangent_heading)
+	else:
+		_heading = tangent_heading
+		_yaw_rate = 0.0
 	if impact < 2.0:
 		return
-	# Удар під кутом до ~60° — машина стає вздовж стіни й ковзає далі; майже лобовий — розвертає частково.
-	var glancing := impact < velocity.length() * 0.87
-	_heading = lerp_angle(_heading, tangent_heading, 1.0 if glancing else 0.7)
-	_drift = 0.0
-	_yaw_rate = 0.0
 	Audio.play_at(&"bump", body.global_position, 0.0 if _is_player_car else -6.0)
 	jolted.emit(clampf(impact / 20.0, 0.2, 0.7))
+
+
+func _start_swing(target: float) -> void:
+	_swing_target = target
+	_swinging = true
+	_yaw_rate = 0.0
+	# Поки розвертаємось, зчеплення лишається «заносним», щоб боковий рух не гасив швидкість.
+	_drift = maxf(_drift, 0.9)
+
+
+## Плавний розворот після удару задом (див. _on_barrier_hit). Повертає true, поки триває.
+func _update_swing(delta: float) -> bool:
+	if not _swinging:
+		return false
+	_heading = rotate_toward(_heading, _swing_target, SWING_RATE * delta)
+	_drift = maxf(_drift, 0.9)
+	if absf(angle_difference(_heading, _swing_target)) < deg_to_rad(4.0):
+		_swinging = false
+	return _swinging
+
+
+## Робить модель напівпрозорою (amount 0..1), коли вона закриває камері машину гравця.
+func set_see_through(amount: float) -> void:
+	if is_equal_approx(amount, _see_through):
+		return
+	_see_through = amount
+	if _see_materials.is_empty() and amount > 0.0:
+		for node: Node in _model.find_children("*", "MeshInstance3D", true, false):
+			var mesh := node as MeshInstance3D
+			var material := mesh.get_active_material(0) as ShaderMaterial
+			if material:
+				var own := material.duplicate() as ShaderMaterial
+				mesh.material_override = own
+				_see_materials.append(own)
+	for material: ShaderMaterial in _see_materials:
+		material.set_shader_parameter(&"see_through", amount)
+	for node: Node in _model.find_children("*", "Label3D", true, false):
+		(node as Label3D).modulate.a = 1.0 - amount
 
 
 ## Іскри від тертя об бар'єр (вмикаються в _animate, поки машина треться об стіну).
@@ -659,6 +713,7 @@ func respawn(silent: bool = false) -> void:
 	ball.angular_velocity = Vector3.ZERO
 	_yaw_kick = 0.0
 	_yaw_rate = 0.0
+	_swinging = false
 	_boost_left = 0.0
 	_jumping = false
 	_slow_left = 0.0
@@ -708,7 +763,8 @@ func _physics_process(delta: float) -> void:
 		throttle_input = 0.0
 		steer_input = 0.0
 	_update_drift(speed, delta)
-	_steer(speed, delta)
+	if not _update_swing(delta):
+		_steer(speed, delta)
 	if _yaw_kick != 0.0:
 		_heading += _yaw_kick * delta
 		_yaw_kick *= exp(-delta / YAW_KICK_TIME)
@@ -798,6 +854,9 @@ func _drive(forward: Vector3, right: Vector3, velocity: Vector3, speed: float, d
 	elif speed > top_speed + 0.5:
 		# Швидше за ліміт (наприклад, з'їхав на траву) — гальмуємо до нього.
 		accel = -(offroad_decel if _offroad else coast_decel)
+	elif throttle_input > 0.0 and _swinging and speed < 0.0:
+		# Розвертаємось після удару задом: газ не гальмує машину, вона котиться далі.
+		accel = 0.0
 	elif throttle_input > 0.0:
 		# Розгін плавно слабшає в останній чверті до максимуму.
 		var headroom := clampf((top_speed - speed) / (top_speed * 0.25), 0.15, 1.0)
@@ -808,8 +867,10 @@ func _drive(forward: Vector3, right: Vector3, velocity: Vector3, speed: float, d
 
 	var lateral_speed := velocity.dot(right)
 	_lateral_speed = lateral_speed
-	var force := forward * accel - right * lateral_speed * lerpf(grip, drift_grip, _drift)
-	if _drift > 0.0:
+	# Під час розвороту після удару задом машина майже не тримає дорогу боком — ковзає, не губить швидкість.
+	var side_grip := 0.15 if _swinging else lerpf(grip, drift_grip, _drift)
+	var force := forward * accel - right * lateral_speed * side_grip
+	if _drift > 0.0 and not _swinging:
 		force -= forward * signf(speed) * drift_scrub * absf(lateral_speed) * _drift
 	ball.apply_central_force(force * ball.mass)
 

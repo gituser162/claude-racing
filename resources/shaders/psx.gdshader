@@ -20,6 +20,16 @@ uniform vec2 snap_grid = vec2(0.0);
 uniform float affine_strength = 0.0;
 
 global uniform sampler2D psx_detail : filter_nearest_mipmap, repeat_enable;
+// «Сітчаста» прозорість (0 — звичайний, 1 — невидимий): частина пікселів відкидається
+// за шаблоном Баєра, як на старих консолях. Напр. машина, що закриває камері гравця
+// (див. Car.set_see_through — машина отримує власні копії матеріалів).
+uniform float see_through = 0.0;
+
+const float BAYER4[16] = float[](
+	0.0, 8.0, 2.0, 10.0,
+	12.0, 4.0, 14.0, 6.0,
+	3.0, 11.0, 1.0, 9.0,
+	15.0, 7.0, 13.0, 5.0);
 
 varying vec3 local_pos;
 varying vec3 local_normal;
@@ -35,6 +45,12 @@ void vertex() {
 }
 
 void fragment() {
+	if (see_through > 0.0) {
+		ivec2 cell = ivec2(FRAGCOORD.xy / 2.0) % 4;
+		if ((BAYER4[cell.y * 4 + cell.x] + 0.5) / 16.0 < see_through) {
+			discard;
+		}
+	}
 	vec3 color = albedo.rgb * texture(albedo_texture, UV * uv_scale).rgb;
 	if (detail_strength > 0.0) {
 		vec3 n = abs(local_normal);
