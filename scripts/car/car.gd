@@ -70,6 +70,8 @@ var max_speed: float
 ## Прихований баф «наздоганяння» (множник макс. швидкості). Ставить сцена гонки
 ## для тих, хто відстає (див. main.gd), на HUD не показується.
 var catchup_multiplier: float = 1.0
+## Прихований множник розгону (ставить сцена гонки: боти розганяються швидше, коли гравець лідирує).
+var accel_multiplier: float = 1.0
 var acceleration: float
 var turn_speed: float
 
@@ -616,7 +618,7 @@ func _drive(forward: Vector3, right: Vector3, velocity: Vector3, speed: float, d
 		# Розгін плавно слабшає в останній чверті до максимуму.
 		var headroom := clampf((top_speed - speed) / (top_speed * 0.25), 0.15, 1.0)
 		# Під час турбо розганяємось помітно сильніше.
-		accel = acceleration * throttle_input * headroom * (1.0 + (boost - 1.0) * 3.0)
+		accel = acceleration * accel_multiplier * throttle_input * headroom * (1.0 + (boost - 1.0) * 3.0)
 	else:
 		accel = -signf(speed) * minf(coast_decel, absf(speed) / delta)
 

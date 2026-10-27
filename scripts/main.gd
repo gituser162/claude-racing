@@ -24,6 +24,8 @@ const SKILL_START_LOCK: float = 3.0
 const CATCHUP_FROM_PLACE: int = 4
 const CATCHUP_SPEED: float = 1.15
 const CATCHUP_INTERVAL: float = 0.25
+## Прихований баф ботам: +10% розгону, поки гравець на 1-му місці.
+const BOT_ACCEL_WHEN_PLAYER_LEADS: float = 1.10
 ## Тимчасово, поки гонщик один: боти різної ваги, щоб відчути зіткнення.
 ## Порядок як у BOT_COLORS: бірюзовий, жовтий, фіолетовий, білий, зелений, помаранчевий, рожевий.
 const BOT_WEIGHTS: Array[int] = [3, 1, 2, 3, 1, 2, 3]
@@ -200,11 +202,15 @@ func _update_catchup(delta: float) -> void:
 		return
 	_catchup_timer = CATCHUP_INTERVAL
 	var order := _current_order()
+	var player_state: CarRaceState = _states[_car]
+	var player_leads: bool = order[0] == _car and not player_state.finished
 	for i: int in order.size():
 		var car := order[i]
 		var state: CarRaceState = _states[car]
 		var behind: bool = i + 1 >= CATCHUP_FROM_PLACE and not state.finished
 		car.catchup_multiplier = CATCHUP_SPEED if behind else 1.0
+		var bot_boost: bool = car != _car and player_leads and not state.finished
+		car.accel_multiplier = BOT_ACCEL_WHEN_PLAYER_LEADS if bot_boost else 1.0
 
 
 ## «Не той бік»: гравець їде проти напрямку траси.
