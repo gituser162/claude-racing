@@ -72,6 +72,8 @@ var _slow_left: float = 0.0
 var _slow_factor: float = 1.0
 var _spin_left: float = 0.0
 var _spin_rate: float = 0.0
+## Курс, з яким машина вийде з розкрутки (той самий, що був до неї).
+var _spin_end_heading: float = 0.0
 var _protect_left: float = 0.0
 var _ghost_left: float = 0.0
 var _mass_left: float = 0.0
@@ -303,12 +305,15 @@ func is_slowed() -> bool:
 	return _slow_left > 0.0
 
 
-## Розкрутка: машина втрачає керування й крутиться duration с, швидкість падає вдвічі.
+## Розкрутка: машина втрачає керування й робить рівно один оберт за duration с,
+## швидкість падає вдвічі. Після оберту машина дивиться туди ж, куди їхала, а не задом.
 func spin_out(duration: float = 0.9) -> bool:
 	if is_protected() or is_spinning():
 		return false
+	var direction := 1.0 if randf() < 0.5 else -1.0
 	_spin_left = duration
-	_spin_rate = TAU * 1.5 / duration * (1.0 if randf() < 0.5 else -1.0)
+	_spin_rate = TAU / duration * direction
+	_spin_end_heading = _heading + TAU * direction
 	ball.linear_velocity *= Vector3(0.5, 1.0, 0.5)
 	Audio.play_at(&"spin", body.global_position)
 	jolted.emit(0.6)
@@ -488,6 +493,10 @@ func _tick_effects(delta: float) -> void:
 	if _spin_left > 0.0:
 		_spin_left -= delta
 		_heading += _spin_rate * delta
+		if _spin_left <= 0.0:
+			# Точно повертаємо курс, без похибки накопичення.
+			_spin_left = 0.0
+			_heading = _spin_end_heading
 
 
 func _read_player_input() -> void:
