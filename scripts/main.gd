@@ -72,6 +72,7 @@ class CarRaceState:
 
 func _ready() -> void:
 	_track.checkpoint_passed.connect(_on_checkpoint_passed)
+	_car.enable_headlight_light()
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	var slots := Game.bot_count + 1

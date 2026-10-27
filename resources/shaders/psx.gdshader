@@ -1,41 +1,49 @@
 shader_type spatial;
-// Базовий матеріал у стилі PS1:
-//  - вершини прилипають до екранної сітки («тремтіння»);
-//  - афінні текстури без перспективної корекції;
-//  - освітлення по вершинах, без бліків;
-//  - текстури без фільтрації.
-render_mode vertex_lighting, specular_disabled;
+// Базовий матеріал у стилі «сучасний PS1» (HD-PS1):
+//  - чітка геометрія в повній роздільності, без тремтіння вершин;
+//  - великі «пікселі» текстур (nearest): на кожну поверхню накладається спільна
+//    текстура деталей (шви панелей, заклепки, бруд) з фіксованою щільністю тексел/метр;
+//  - освітлення по пікселях, м'які відблиски.
+// Ім'я файлу й параметри лишились старими, щоб не міняти всі матеріали.
 
 uniform vec4 albedo : source_color = vec4(1.0);
-uniform sampler2D albedo_texture : source_color, filter_nearest, repeat_enable, hint_default_white;
+uniform sampler2D albedo_texture : source_color, filter_nearest_mipmap, repeat_enable, hint_default_white;
 uniform vec2 uv_scale = vec2(1.0);
 uniform vec4 emission : source_color = vec4(0.0, 0.0, 0.0, 1.0);
 uniform float emission_energy = 0.0;
-// Розмір «сітки», до якої прилипають вершини (менше — сильніше тремтить). 0 — вимкнено.
-uniform vec2 snap_grid = vec2(320.0, 180.0);
-// 1.0 — повністю афінні текстури, 0.0 — звичайні.
-uniform float affine_strength = 1.0;
+// Сила текстури деталей (0 — гладкий колір) і скільки її текселів на метр.
+uniform float detail_strength = 1.0;
+uniform float texel_density = 10.0;
+uniform float roughness : hint_range(0.0, 1.0) = 0.7;
+// Застарілі параметри PS1-стилю (тремтіння, афінні UV) — більше не діють.
+uniform vec2 snap_grid = vec2(0.0);
+uniform float affine_strength = 0.0;
 
-varying vec2 persp_uv;
-varying vec3 affine_uv;
+global uniform sampler2D psx_detail : filter_nearest_mipmap, repeat_enable;
+
+varying vec3 local_pos;
+varying vec3 local_normal;
 
 void vertex() {
-	vec4 clip = PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
-	if (snap_grid.x > 0.0 && clip.w > 0.0) {
-		vec2 half_grid = snap_grid * 0.5;
-		vec2 ndc = clip.xy / clip.w;
-		ndc = floor(ndc * half_grid + 0.5) / half_grid;
-		clip.xy = ndc * clip.w;
-	}
-	POSITION = clip;
-	vec2 uv = UV * uv_scale;
-	persp_uv = uv;
-	affine_uv = vec3(uv * clip.w, clip.w);
+	// Координати в системі об'єкта, але в метрах (з урахуванням масштабу) —
+	// так тексели однакового розміру на всіх деталях і не «пливуть», коли машина рухається.
+	vec3 p = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz - MODEL_MATRIX[3].xyz;
+	local_pos = vec3(dot(p, normalize(MODEL_MATRIX[0].xyz)),
+			dot(p, normalize(MODEL_MATRIX[1].xyz)),
+			dot(p, normalize(MODEL_MATRIX[2].xyz)));
+	local_normal = NORMAL;
 }
 
 void fragment() {
-	vec2 uv = mix(persp_uv, affine_uv.xy / affine_uv.z, affine_strength);
-	ALBEDO = albedo.rgb * texture(albedo_texture, uv).rgb;
+	vec3 color = albedo.rgb * texture(albedo_texture, UV * uv_scale).rgb;
+	if (detail_strength > 0.0) {
+		vec3 n = abs(local_normal);
+		vec2 uv = n.x > n.y && n.x > n.z ? local_pos.zy : (n.y > n.z ? local_pos.xz : local_pos.xy);
+		vec3 d = texture(psx_detail, uv * texel_density / 64.0).rgb * 2.0;
+		color *= mix(vec3(1.0), d, detail_strength);
+	}
+	ALBEDO = color;
 	EMISSION = emission.rgb * emission_energy;
-	ROUGHNESS = 1.0;
+	ROUGHNESS = roughness;
+	SPECULAR = 0.35;
 }

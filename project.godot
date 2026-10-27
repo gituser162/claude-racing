@@ -26,11 +26,18 @@ window/size/viewport_width=640
 window/size/viewport_height=360
 window/size/window_width_override=1280
 window/size/window_height_override=720
-window/stretch/mode="viewport"
+window/stretch/mode="canvas_items"
 
 [gui]
 
 theme/custom="res://resources/ui/neon_theme.tres"
+
+[shader_globals]
+
+psx_detail={
+"type": "sampler2D",
+"value": "res://assets/textures/detail.png"
+}
 
 [input]
 
@@ -106,3 +113,5 @@ rendering_device/driver.windows="d3d12"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/default_filters/use_nearest_mipmap_filter=true
+anti_aliasing/quality/msaa_3d=1
+anti_aliasing/quality/msaa_3d.web=0

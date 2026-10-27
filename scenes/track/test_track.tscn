@@ -35,6 +35,7 @@ shader = ExtResource("4_psx")
 shader_parameter/albedo = Color(0.42, 0.4, 0.46, 1)
 shader_parameter/albedo_texture = ExtResource("5_asphalt")
 shader_parameter/uv_scale = Vector2(1, 10)
+shader_parameter/detail_strength = 0.35
 shader_parameter/emission = Color(0, 0, 0, 1)
 shader_parameter/emission_energy = 0.0
 

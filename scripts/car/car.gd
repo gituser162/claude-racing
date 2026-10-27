@@ -176,6 +176,63 @@ func _load_model(scene: PackedScene) -> void:
 	_underglow.scale = Vector3(footprint.x / 1.7, 1.0, footprint.y / 2.9)
 	_jet_flame.scale = _underglow.scale
 	_shield.scale = Vector3(footprint.x * 0.75, 1.0, footprint.y * 0.62)
+	_build_headlights()
+
+
+## Промені фар: два світлові конуси попереду машини (видно в тумані й дощі).
+func _build_headlights() -> void:
+	var old := body.get_node_or_null(^"Headlights")
+	if old:
+		old.free()
+	var holder := Node3D.new()
+	holder.name = "Headlights"
+	body.add_child(holder)
+	var length := 10.0
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = 0.18
+	mesh.bottom_radius = 2.0
+	mesh.height = length
+	mesh.radial_segments = 10
+	mesh.rings = 1
+	mesh.cap_top = false
+	mesh.cap_bottom = false
+	var mat := ShaderMaterial.new()
+	mat.shader = preload("res://resources/shaders/light_beam.gdshader")
+	# Вісь конуса: від фари вперед і трохи вниз (верх циліндра — біля фари).
+	var tilt := deg_to_rad(84.0)
+	var top_dir := Vector3(0.0, cos(tilt), sin(tilt))
+	for side: float in [-1.0, 1.0]:
+		var beam := MeshInstance3D.new()
+		beam.mesh = mesh
+		beam.material_override = mat
+		beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var source := Vector3(side * footprint.x * 0.32, 0.55, -footprint.y * 0.5)
+		beam.position = source - top_dir * length * 0.5
+		beam.rotation.x = tilt
+		holder.add_child(beam)
+
+
+## Справжнє світло фар (SpotLight) — лише для машини гравця, щоб не навантажувати рендер.
+func enable_headlight_light() -> void:
+	var light := SpotLight3D.new()
+	light.name = "HeadlightLight"
+	light.light_color = Color(1.0, 0.92, 0.78)
+	light.light_energy = 4.0
+	light.spot_range = 26.0
+	light.spot_angle = 32.0
+	light.spot_attenuation = 0.8
+	light.position = Vector3(0.0, 1.2, -footprint.y * 0.5)
+	light.rotation.x = deg_to_rad(-12.0)
+	body.add_child(light)
+	# М'яке заповнювальне світло ззаду-зверху: інакше з камери видно лише темний силует.
+	var fill := OmniLight3D.new()
+	fill.name = "FillLight"
+	fill.light_color = Color(0.8, 0.75, 1.0)
+	fill.light_energy = 1.4
+	fill.omni_range = 9.0
+	fill.omni_attenuation = 1.2
+	fill.position = Vector3(0.0, 3.0, footprint.y * 0.5 + 3.0)
+	body.add_child(fill)
 
 
 ## Напрямок «вперед» за курсом машини (горизонтальний).

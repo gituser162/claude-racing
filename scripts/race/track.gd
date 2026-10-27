@@ -179,6 +179,21 @@ func _spawn_lamps() -> void:
 	head_mesh.size = Vector3(1.4, 0.18, 0.5)
 	var pole_mat := _psx_material(Color(0.12, 0.12, 0.14))
 	var head_mat := _psx_material(Color(0.8, 0.95, 1.0), Color(0.75, 0.9, 1.0), 3.0)
+	head_mat.set_shader_parameter(&"detail_strength", 0.0)
+	# Світловий конус від ліхтаря до дороги — як світло в смозі.
+	var beam_mesh := CylinderMesh.new()
+	beam_mesh.top_radius = 0.45
+	beam_mesh.bottom_radius = 3.6
+	beam_mesh.height = 7.6
+	beam_mesh.radial_segments = 10
+	beam_mesh.rings = 1
+	beam_mesh.cap_top = false
+	beam_mesh.cap_bottom = false
+	var beam_mat := ShaderMaterial.new()
+	beam_mat.shader = preload("res://resources/shaders/light_beam.gdshader")
+	beam_mat.set_shader_parameter(&"color", Color(0.7, 0.88, 1.0))
+	beam_mat.set_shader_parameter(&"intensity", 0.16)
+	beam_mat.set_shader_parameter(&"falloff", 0.9)
 
 	var holder := Node3D.new()
 	holder.name = "Lamps"
@@ -206,6 +221,12 @@ func _spawn_lamps() -> void:
 			lamp.add_child(pole)
 			lamp.add_child(arm)
 			lamp.add_child(head)
+			var beam := MeshInstance3D.new()
+			beam.mesh = beam_mesh
+			beam.material_override = beam_mat
+			beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			beam.position = Vector3(-side * 2.0, 7.75 - 3.8, 0.0)
+			lamp.add_child(beam)
 			holder.add_child(lamp)
 
 
