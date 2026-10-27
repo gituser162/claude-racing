@@ -60,6 +60,13 @@ var footprint: Vector2 = Vector2(1.7, 2.9)
 @export var drift_turn_boost: float = 1.35
 ## Втрата швидкості від бокового ковзання.
 @export var drift_scrub: float = 0.18
+## Як швидко кермо змінює обертання машини в повному заносі (1/с). Звичайне — майже миттєво (30).
+## Мале значення — машина «пливе»: обертання наростає й гасне повільно, доводиться ловити контрукермом.
+@export var drift_steer_response: float = 1.6
+## Як швидко повертається зчеплення після заносу (частка за секунду).
+@export var drift_recovery: float = 0.7
+## Поки бокове ковзання більше за це (м/с), занос не закінчується, навіть якщо відпустити кермо.
+@export var drift_hold_slip: float = 4.0
 
 @export_group("Вигляд")
 @export var max_wheel_angle: float = 0.45
@@ -79,6 +86,8 @@ var _heading: float = 0.0
 var _grounded: bool = false
 var _offroad: bool = false
 var _yaw_kick: float = 0.0   # рад/с, затухає
+## Поточна швидкість обертання від керма (рад/с). У заносі змінюється з інерцією.
+var _yaw_rate: float = 0.0
 var _boost_left: float = 0.0
 var _boost_multiplier: float = 1.0
 var _jumping: bool = false
@@ -278,6 +287,7 @@ func _on_ball_shape_entered(_rid: RID, other: Node, shape_index: int, _local_sha
 	var glancing := impact < velocity.length() * 0.7
 	_heading = lerp_angle(_heading, atan2(-along.x, -along.z), 1.0 if glancing else 0.7)
 	_drift = 0.0
+	_yaw_rate = 0.0
 	Audio.play_at(&"bump", body.global_position, 0.0 if _is_player_car else -6.0)
 	jolted.emit(clampf(impact / 20.0, 0.2, 0.7))
 
@@ -523,6 +533,7 @@ func respawn(silent: bool = false) -> void:
 	ball.linear_velocity = Vector3.ZERO
 	ball.angular_velocity = Vector3.ZERO
 	_yaw_kick = 0.0
+	_yaw_rate = 0.0
 	_boost_left = 0.0
 	_jumping = false
 	_slow_left = 0.0
@@ -626,7 +637,11 @@ func _steer(speed: float, delta: float) -> void:
 	var direction := -1.0 if speed < -0.5 else 1.0
 	var air := 1.0 if _grounded else (_jump_air_steer if _jumping else air_steer_factor)
 	var drift_turn := 1.0 + (drift_turn_boost - 1.0) * _drift
-	_heading += steer_input * turn_speed * _steer_multiplier * speed_factor * high_speed_factor * direction * air * drift_turn * delta
+	var wanted := steer_input * turn_speed * _steer_multiplier * speed_factor * high_speed_factor * direction * air * drift_turn
+	# Без заносу обертання слухається керма майже миттєво; у заносі — з великою інерцією.
+	var response := lerpf(30.0, drift_steer_response, _drift)
+	_yaw_rate = lerpf(_yaw_rate, wanted, 1.0 - exp(-response * delta))
+	_heading += _yaw_rate * delta
 
 
 ## Занос: на великій швидкості й при сильному повороті бокове зчеплення слабшає,
@@ -637,7 +652,10 @@ func _update_drift(speed: float, delta: float) -> void:
 		var speed_ratio := speed / maxf(max_speed, 0.1)
 		target = smoothstep(drift_speed_start, drift_speed_start + 0.15, speed_ratio) \
 			* smoothstep(drift_steer_start, 1.0, absf(steer_input))
-	_drift = move_toward(_drift, target, delta * (4.0 if target > _drift else 2.5))
+		# Уже в заносі: тримаємось у ньому, поки машину несе боком на пристойній швидкості.
+		if _drift > 0.0 and speed_ratio > 0.35:
+			target = maxf(target, smoothstep(drift_hold_slip * 0.5, drift_hold_slip * 1.5, absf(_lateral_speed)))
+	_drift = move_toward(_drift, target, delta * (4.0 if target > _drift else drift_recovery))
 	if not _grounded:
 		_lateral_speed = 0.0
 
