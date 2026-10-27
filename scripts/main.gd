@@ -20,6 +20,10 @@ const COUNTDOWN_TIME: float = 3.0
 const WRONG_WAY_DELAY: float = 0.8
 ## Скільки секунд після старту скіли заблоковані.
 const SKILL_START_LOCK: float = 3.0
+## Прихований баф наздоганяння: з якого місця діє, множник макс. швидкості, як часто перераховувати.
+const CATCHUP_FROM_PLACE: int = 4
+const CATCHUP_SPEED: float = 1.15
+const CATCHUP_INTERVAL: float = 0.25
 ## Тимчасово, поки гонщик один: боти різної ваги, щоб відчути зіткнення.
 ## Порядок як у BOT_COLORS: бірюзовий, жовтий, фіолетовий, білий, зелений, помаранчевий, рожевий.
 const BOT_WEIGHTS: Array[int] = [3, 1, 2, 3, 1, 2, 3]
@@ -57,6 +61,7 @@ var _phase: Phase = Phase.COUNTDOWN
 var _countdown_left: float = COUNTDOWN_TIME
 var _last_countdown_number: int = 0
 var _wrong_way_time: float = 0.0
+var _catchup_timer: float = 0.0
 
 
 class CarRaceState:
@@ -185,6 +190,21 @@ func _physics_process(delta: float) -> void:
 		return
 	_race_time += delta
 	_check_wrong_way(delta)
+	_update_catchup(delta)
+
+
+## Прихований баф для тих, хто відстає (див. константи CATCHUP_* угорі).
+func _update_catchup(delta: float) -> void:
+	_catchup_timer -= delta
+	if _catchup_timer > 0.0:
+		return
+	_catchup_timer = CATCHUP_INTERVAL
+	var order := _current_order()
+	for i: int in order.size():
+		var car := order[i]
+		var state: CarRaceState = _states[car]
+		var behind: bool = i + 1 >= CATCHUP_FROM_PLACE and not state.finished
+		car.catchup_multiplier = CATCHUP_SPEED if behind else 1.0
 
 
 ## «Не той бік»: гравець їде проти напрямку траси.

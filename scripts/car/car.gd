@@ -56,6 +56,9 @@ var throttle_input: float = 0.0
 var steer_input: float = 0.0
 
 var max_speed: float
+## Прихований баф «наздоганяння» (множник макс. швидкості). Ставить сцена гонки
+## для тих, хто відстає (див. main.gd), на HUD не показується.
+var catchup_multiplier: float = 1.0
 var acceleration: float
 var turn_speed: float
 
@@ -520,7 +523,7 @@ func _drive(forward: Vector3, right: Vector3, velocity: Vector3, speed: float, d
 	var accel := 0.0
 	var boost := _boost_multiplier if _boost_left > 0.0 else 1.0
 	var slow := _slow_factor if _slow_left > 0.0 else 1.0
-	var top_speed := max_speed * boost * slow * (offroad_speed_factor if _offroad else 1.0)
+	var top_speed := max_speed * catchup_multiplier * boost * slow * (offroad_speed_factor if _offroad else 1.0)
 	if throttle_input < 0.0:
 		if speed > 0.5:
 			accel = brake_decel * throttle_input

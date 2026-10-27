@@ -79,7 +79,7 @@ func _physics_process(delta: float) -> void:
 
 ## Попереду пряма (найближчі ~70 м без поворотів, що потребують гальмування).
 func is_on_straight() -> bool:
-	return _last_safe_speed >= car.max_speed * skill * 0.98
+	return _last_safe_speed >= car.max_speed * car.catchup_multiplier * skill * 0.98
 
 
 ## Відстань до найближчої машини попереду в нашій смузі (INF, якщо нікого).
@@ -134,7 +134,7 @@ func _update_lane(pos: Vector3, delta: float) -> void:
 ## Максимальна швидкість, з якою можна їхати зараз, щоб встигнути загальмувати
 ## перед найкрутішим поворотом попереду.
 func _safe_speed(offset: float) -> float:
-	var limit := car.max_speed * skill
+	var limit := car.max_speed * car.catchup_multiplier * skill
 	var yaw_rate := car.turn_speed * lerpf(1.0, car.high_speed_turn_factor, 0.8) * corner_caution
 	var segment := 8.0
 	var prev_dir := _track_dir(offset)
