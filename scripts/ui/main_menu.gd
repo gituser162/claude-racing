@@ -113,8 +113,11 @@ func _input(event: InputEvent) -> void:
 	elif event.is_action_pressed(&"ui_right") or event.is_action_pressed(&"steer_right"):
 		_change_row_value(_row, 1)
 	elif event.is_action_pressed(&"ui_accept"):
+		# Позначаємо натискання обробленим ДО зміни сцени: після неї меню вже не в дереві.
+		get_viewport().set_input_as_handled()
 		Audio.play(&"ui_select", -3.0)
 		_start_race()
+		return
 	else:
 		return
 	get_viewport().set_input_as_handled()
