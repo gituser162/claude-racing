@@ -278,13 +278,39 @@ func _build_headlights() -> void:
 func _check_barriers(delta: float) -> void:
 	_scraping = false
 	_barrier_shape.size = Vector3(footprint.x, 0.8, footprint.y)
+	# Два проходи: удар може розвернути машину вздовж стіни, і тоді кут кузова
+	# опиняється в стіні вже з новим курсом — другий прохід його виштовхує.
+	for pass_index: int in 2:
+		var contact := _barrier_penetration(delta)
+		if contact.is_empty():
+			break
+		var normal: Vector3 = contact.normal
+		var along: Vector3 = contact.along
+		ball.global_position += normal * float(contact.depth)
+		_slide_along_barrier(along, normal)
+		if pass_index == 0:
+			_on_barrier_hit(along, normal)
+		_scraping = true
+		_scrape_point = contact.corner
+		_scrape_normal = normal
+	if not _scraping:
+		_barrier_cooldown = maxf(_barrier_cooldown - delta, 0.0)
+
+
+## Найглибше реальне проникнення контуру кузова в бар'єр (з урахуванням руху за кадр).
+## Повертає {depth, normal, along, corner} або порожній словник.
+func _barrier_penetration(delta: float) -> Dictionary:
 	var forward := get_forward()
 	var right := Vector3(-forward.z, 0.0, forward.x)
 	# Перевіряємо положення, де машина буде ПІСЛЯ кроку фізики (інакше на швидкості
 	# кут кузова встигає зайти в стіну на кадр).
 	var center := ball.global_position + ball.linear_velocity * delta + Vector3.UP * 0.2
 	_barrier_query.transform = Transform3D(Basis(right, Vector3.UP, -forward), center)
-	var hits := get_world_3d().direct_space_state.intersect_shape(_barrier_query, 4)
+	var hits := get_world_3d().direct_space_state.intersect_shape(_barrier_query, 6)
+	# Серед усіх сегментів стіни, яких торкається кузов, беремо найглибше реальне проникнення
+	# (інакше на стику двох сегментів машину штовхало двічі й відкидало).
+	var best := {}
+	var best_depth := 0.0
 	for hit: Dictionary in hits:
 		var wall := hit.collider as CollisionObject3D
 		if wall == null:
@@ -292,6 +318,7 @@ func _check_barriers(delta: float) -> void:
 		var shape_node := wall.shape_owner_get_owner(wall.shape_find_owner(hit.shape)) as CollisionShape3D
 		if shape_node == null:
 			continue
+		var box := shape_node.shape as BoxShape3D
 		var along := shape_node.global_basis.z
 		along.y = 0.0
 		along = along.normalized()
@@ -299,43 +326,59 @@ func _check_barriers(delta: float) -> void:
 		var normal := along.cross(Vector3.UP)
 		if (center - shape_node.global_position).dot(normal) < 0.0:
 			normal = -normal
-		var half_thickness: float = (shape_node.shape as BoxShape3D).size.x * 0.5
-		var face := shape_node.global_position + normal * half_thickness
-		# Наскільки кузов виступає в бік стіни від центру машини.
-		var extent := absf(normal.dot(right)) * footprint.x * 0.5 + absf(normal.dot(forward)) * footprint.y * 0.5
-		var depth := extent - (center - face).dot(normal)
-		if depth <= 0.0:
+		var face := shape_node.global_position + normal * box.size.x * 0.5
+		# Кут кузова, що найглибше заходить у бік стіни.
+		var corner := center - right * signf(normal.dot(right)) * footprint.x * 0.5 \
+			- forward * signf(normal.dot(forward)) * footprint.y * 0.5
+		# Лише якщо цей кут навпроти саме цього сегмента: торці сегментів не рахуються як стіна
+		# (раніше площина сегмента вважалась нескінченною — і під деякими кутами машину відкидало).
+		if absf((corner - shape_node.global_position).dot(along)) > box.size.z * 0.5 + 0.15:
 			continue
-		ball.global_position += normal * depth
-		var into := ball.linear_velocity.dot(normal)
-		if into < 0.0:
-			ball.linear_velocity -= normal * into
-		_on_barrier_hit(along, normal)
-		_scraping = true
-		_scrape_point = center - normal * extent
-		_scrape_normal = normal
-	if not _scraping:
-		_barrier_cooldown = maxf(_barrier_cooldown - delta, 0.0)
+		var depth := (face - corner).dot(normal)
+		if depth > best_depth:
+			best_depth = depth
+			best = {"depth": depth, "normal": normal, "along": along, "corner": corner}
+	return best
+
+
+## Аркадне ковзання вздовж бар'єра: швидкість перенаправляється вздовж стіни й майже не губиться
+## (під кутом 25° лишається ~95%, 45° — ~84%); лише удар майже в лоб помітно зупиняє машину.
+## Стіна ніколи не відкидає машину від себе.
+func _slide_along_barrier(along: Vector3, normal: Vector3) -> void:
+	var velocity := ball.linear_velocity
+	var flat := Vector3(velocity.x, 0.0, velocity.z)
+	var into := flat.dot(normal)
+	if into >= 0.0 and into <= 1.0:
+		return
+	var speed := flat.length()
+	if speed < 0.01:
+		return
+	var tangent := along if flat.dot(along) >= 0.0 else -along
+	var keep := 1.0
+	if into < 0.0:
+		keep = sqrt(clampf(absf(flat.normalized().dot(tangent)), 0.0, 1.0))
+	flat = tangent * speed * keep + normal * clampf(into, 0.0, 1.0)
+	ball.linear_velocity = Vector3(flat.x, velocity.y, flat.z)
 
 
 func _on_barrier_hit(along: Vector3, normal: Vector3) -> void:
-	if _barrier_cooldown > 0.0:
-		_barrier_cooldown = 0.5
-		return
 	var velocity := _prev_velocity
 	velocity.y = 0.0
 	if velocity.dot(along) < 0.0:
 		along = -along
+	var tangent_heading := atan2(-along.x, -along.z)
+	if _barrier_cooldown > 0.0:
+		# Продовжуємо тертись об стіну: машина плавно йде вздовж неї, як по напрямній.
+		_barrier_cooldown = 0.5
+		_heading = lerp_angle(_heading, tangent_heading, 0.25)
+		return
 	var impact := absf(velocity.dot(normal))
 	_barrier_cooldown = 0.5
 	if impact < 2.0:
 		return
-	# Складову швидкості в стіну вже погашено; зверху — невеликий штраф за удар (до 30%).
-	var loss := clampf(impact / 80.0, 0.05, 0.3)
-	ball.linear_velocity *= 1.0 - loss
-	# Ковзний удар — машина стає вздовж стіни й ковзає далі; майже лобовий — розвертає частково.
-	var glancing := impact < velocity.length() * 0.7
-	_heading = lerp_angle(_heading, atan2(-along.x, -along.z), 1.0 if glancing else 0.7)
+	# Удар під кутом до ~60° — машина стає вздовж стіни й ковзає далі; майже лобовий — розвертає частково.
+	var glancing := impact < velocity.length() * 0.87
+	_heading = lerp_angle(_heading, tangent_heading, 1.0 if glancing else 0.7)
 	_drift = 0.0
 	_yaw_rate = 0.0
 	Audio.play_at(&"bump", body.global_position, 0.0 if _is_player_car else -6.0)

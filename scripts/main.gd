@@ -26,6 +26,8 @@ const CATCHUP_SPEED: float = 1.15
 const CATCHUP_INTERVAL: float = 0.25
 ## Прихований баф ботам: +10% макс. швидкості, поки гравець на 1-му місці.
 const BOT_SPEED_WHEN_PLAYER_LEADS: float = 1.10
+## Прихований дебаф ботам: −20% макс. швидкості, поки гравець на останньому місці.
+const BOT_SPEED_WHEN_PLAYER_LAST: float = 0.8
 ## Тимчасово, поки гонщик один: боти різної ваги, щоб відчути зіткнення.
 ## Порядок як у BOT_COLORS: бірюзовий, жовтий, фіолетовий, білий, зелений, помаранчевий, рожевий.
 const BOT_WEIGHTS: Array[int] = [3, 1, 2, 3, 1, 2, 3]
@@ -195,7 +197,9 @@ func _physics_process(delta: float) -> void:
 	_update_catchup(delta)
 
 
-## Прихований баф для тих, хто відстає (див. константи CATCHUP_* угорі).
+## Прихований баф для тих, хто відстає (див. константи CATCHUP_* угорі),
+## баф ботам, поки гравець лідирує, і дебаф ботам, поки гравець останній.
+## Множники перемножуються (бот на 4-му+ місці, коли гравець останній: 1.15 × 0.8).
 func _update_catchup(delta: float) -> void:
 	_catchup_timer -= delta
 	if _catchup_timer > 0.0:
@@ -204,14 +208,19 @@ func _update_catchup(delta: float) -> void:
 	var order := _current_order()
 	var player_state: CarRaceState = _states[_car]
 	var player_leads: bool = order[0] == _car and not player_state.finished
+	# Лише коли машин більше однієї — інакше гравець водночас і перший, і останній.
+	var player_last: bool = order.size() > 1 and order[order.size() - 1] == _car \
+			and not player_state.finished
 	for i: int in order.size():
 		var car := order[i]
 		var state: CarRaceState = _states[car]
 		var behind: bool = i + 1 >= CATCHUP_FROM_PLACE and not state.finished
-		var bot_boost: bool = car != _car and player_leads and not state.finished
+		var is_active_bot: bool = car != _car and not state.finished
 		var multiplier := CATCHUP_SPEED if behind else 1.0
-		if bot_boost:
+		if is_active_bot and player_leads:
 			multiplier *= BOT_SPEED_WHEN_PLAYER_LEADS
+		if is_active_bot and player_last:
+			multiplier *= BOT_SPEED_WHEN_PLAYER_LAST
 		car.catchup_multiplier = multiplier
 
 
