@@ -52,14 +52,14 @@ var footprint: Vector2 = Vector2(1.7, 2.9)
 
 @export_group("Занос")
 ## З якої частки макс. швидкості й якого відхилення керма машину починає заносити.
-@export var drift_speed_start: float = 0.72
-@export var drift_steer_start: float = 0.55
+@export var drift_speed_start: float = 0.62
+@export var drift_steer_start: float = 0.45
 ## Бокове зчеплення в повному заносі (звичайне — grip). Менше — довше ковзає вбік.
-@export var drift_grip: float = 3.5
+@export var drift_grip: float = 1.4
 ## У заносі машина повертається трохи сильніше — «хвіст» виносить назовні.
-@export var drift_turn_boost: float = 1.25
+@export var drift_turn_boost: float = 1.35
 ## Втрата швидкості від бокового ковзання.
-@export var drift_scrub: float = 0.35
+@export var drift_scrub: float = 0.18
 
 @export_group("Вигляд")
 @export var max_wheel_angle: float = 0.45
@@ -110,6 +110,10 @@ var _drift: float = 0.0
 var _lateral_speed: float = 0.0
 var _skid: AudioStreamPlayer3D
 var _smoke: Array[CPUParticles3D] = []
+## Пауза між ударами об бар'єр, щоб ковзання вздовж стіни не рахувалось як серія ударів.
+var _barrier_cooldown: float = 0.0
+## Швидкість кулі до кроку фізики: сигнал зіткнення приходить уже після удару.
+var _prev_velocity: Vector3 = Vector3.ZERO
 var _is_player_car: bool = false
 var _air_time: float = 0.0
 var _ground_normal: Vector3 = Vector3.UP
@@ -152,6 +156,10 @@ func _ready() -> void:
 	body.add_child(_skid)
 	_slow_ring = _make_slow_ring()
 	body.add_child(_slow_ring)
+	# Удари об бар'єри: потрібен список контактів кулі.
+	ball.contact_monitor = true
+	ball.max_contacts_reported = 4
+	ball.body_shape_entered.connect(_on_ball_shape_entered)
 	_trail = load("res://scripts/car/light_trail.gd").new()
 	_trail.name = "LightTrail"
 	_trail.car = self
@@ -241,6 +249,37 @@ func _build_headlights() -> void:
 		beam.position = source - top_dir * length * 0.5
 		beam.rotation.x = tilt
 		holder.add_child(beam)
+
+
+## Удар об бар'єр (група «barrier»): втрата швидкості пропорційно до сили удару,
+## машину частково розвертає вздовж стіни, камеру трусить.
+func _on_ball_shape_entered(_rid: RID, other: Node, shape_index: int, _local_shape: int) -> void:
+	if other == null or not other.is_in_group(&"barrier") or _barrier_cooldown > 0.0:
+		return
+	var owner_id: int = (other as CollisionObject3D).shape_find_owner(shape_index)
+	var shape_node := (other as CollisionObject3D).shape_owner_get_owner(owner_id) as Node3D
+	if shape_node == null:
+		return
+	var along := shape_node.global_basis.z
+	along.y = 0.0
+	along = along.normalized()
+	var velocity := _prev_velocity
+	velocity.y = 0.0
+	if velocity.dot(along) < 0.0:
+		along = -along
+	var impact := absf(velocity.dot(along.cross(Vector3.UP)))
+	if impact < 2.0:
+		return
+	_barrier_cooldown = 0.5
+	# Складову швидкості в стіну вже погасила фізика; зверху — невеликий штраф за удар (до 30%).
+	var loss := clampf(impact / 80.0, 0.05, 0.3)
+	ball.linear_velocity *= 1.0 - loss
+	# Ковзний удар — машина стає вздовж стіни й ковзає далі; майже лобовий — розвертає частково.
+	var glancing := impact < velocity.length() * 0.7
+	_heading = lerp_angle(_heading, atan2(-along.x, -along.z), 1.0 if glancing else 0.7)
+	_drift = 0.0
+	Audio.play_at(&"bump", body.global_position, 0.0 if _is_player_car else -6.0)
+	jolted.emit(clampf(impact / 20.0, 0.2, 0.7))
 
 
 ## Дим із-під задніх коліс (вмикається в заносі, див. _animate).
@@ -501,6 +540,7 @@ func respawn(silent: bool = false) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_prev_velocity = ball.linear_velocity
 	if controlled_by_player:
 		_read_player_input()
 
@@ -550,6 +590,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _tick_effects(delta: float) -> void:
+	_barrier_cooldown = maxf(_barrier_cooldown - delta, 0.0)
 	_slow_left = maxf(_slow_left - delta, 0.0)
 	_protect_left = maxf(_protect_left - delta, 0.0)
 	_ghost_left = maxf(_ghost_left - delta, 0.0)

@@ -22,6 +22,12 @@ signal checkpoint_passed(car: Car, index: int)
 @export var arch_spacing: float = 160.0
 @export var billboard_spacing: float = 115.0
 
+@export_group("Бар'єри")
+## Бар'єри ставляться із зовнішнього боку поворотів, крутіших за цей радіус, м.
+@export var barrier_max_radius: float = 45.0
+## Запас бар'єра до й після крутої ділянки, м.
+@export var barrier_margin: float = 14.0
+
 ## Вигадана реклама на білбордах (без справжніх брендів).
 const ADS: Array[String] = [
 	"НЕОНОВА ШАУРМА\n24/7", "КІБЕР-БОРЩ\nЯК У БАБУСІ", "ВАРЕНИКИ 2077", "СИНТ-КАВА\nДЛЯ ДЕДЛАЙНІВ",
@@ -49,6 +55,7 @@ func _ready() -> void:
 	_spawn_city()
 	_spawn_pillars()
 	_spawn_lamps()
+	_spawn_barriers()
 	_spawn_arches()
 	_spawn_billboards()
 	var traffic: Node3D = load("res://scripts/race/sky_traffic.gd").new()
@@ -228,6 +235,71 @@ func _spawn_lamps() -> void:
 			beam.position = Vector3(-side * 2.0, 7.75 - 3.8, 0.0)
 			lamp.add_child(beam)
 			holder.add_child(lamp)
+
+
+## Радіус повороту траси в точці offset (м) і його напрямок: +1 — ліворуч, -1 — праворуч.
+func _turn_at(offset: float) -> Vector2:
+	var a := -get_transform_at(offset).basis.z
+	var b := -get_transform_at(offset + 12.0).basis.z
+	var angle := a.signed_angle_to(b, Vector3.UP)
+	return Vector2(12.0 / maxf(absf(angle), 0.0001), signf(angle))
+
+
+## Бар'єри з зовнішнього боку крутих поворотів: там машину, що влетіла занадто швидко,
+## зупиняє стіна. На пологих поворотах бар'єрів немає — звідти можна вилетіти з естакади.
+func _spawn_barriers() -> void:
+	var step := 3.0
+	# Знаходимо круті ділянки: [початок, кінець, бік повороту].
+	var runs: Array[Vector3] = []
+	var offset := 0.0
+	while offset < length:
+		var turn := _turn_at(offset)
+		if turn.x < barrier_max_radius:
+			var start := offset - barrier_margin
+			if not runs.is_empty() and runs[-1].z == turn.y and start - runs[-1].y < 20.0:
+				runs[-1].y = offset + 12.0 + barrier_margin
+			else:
+				runs.append(Vector3(start, offset + 12.0 + barrier_margin, turn.y))
+		offset += 2.0
+
+	var holder := Node3D.new()
+	holder.name = "Barriers"
+	add_child(holder)
+	var block := BoxMesh.new()
+	block.size = Vector3(0.45, 0.95, step)
+	var stripe := BoxMesh.new()
+	stripe.size = Vector3(0.47, 0.14, step * 0.5)
+	var concrete := _psx_material(Color(0.32, 0.31, 0.34))
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(0.6, 1.4, step + 0.1)
+	for run: Vector3 in runs:
+		# Зовнішній бік: поворот ліворуч (+1) — стіна праворуч (+lateral), і навпаки.
+		var side := run.z
+		var neon := NEON_COLORS[1] if side < 0.0 else NEON_COLORS[0]
+		var neon_mat := _psx_material(neon * 0.4, neon, 2.4, false)
+		neon_mat.set_shader_parameter(&"detail_strength", 0.0)
+		var white_mat := _psx_material(Color(0.8, 0.8, 0.85), Color(0.9, 0.9, 1.0), 1.2, false)
+		white_mat.set_shader_parameter(&"detail_strength", 0.0)
+		var wall := StaticBody3D.new()
+		wall.name = "Barrier"
+		wall.collision_layer = 1
+		wall.collision_mask = 0
+		wall.add_to_group(&"barrier")
+		holder.add_child(wall)
+		var count := int((run.y - run.x) / step)
+		for i: int in count:
+			var t := get_transform_at(run.x + (i + 0.5) * step, side * (road_width * 0.5 + 0.25))
+			var segment := Node3D.new()
+			segment.transform = t
+			wall.add_child(segment)
+			_add_mesh(segment, block, concrete, Vector3(0.0, 0.47, 0.0))
+			# Смуги-«зебра»: неон і біле по черзі, щоб поворот читався здалеку.
+			_add_mesh(segment, stripe, neon_mat, Vector3(0.0, 0.78, -step * 0.25))
+			_add_mesh(segment, stripe, white_mat, Vector3(0.0, 0.78, step * 0.25))
+			var collider := CollisionShape3D.new()
+			collider.shape = shape
+			collider.transform = t.translated_local(Vector3(0.0, 0.7, 0.0))
+			wall.add_child(collider)
 
 
 ## Опори під естакадою — від низу дороги до землі міста.
