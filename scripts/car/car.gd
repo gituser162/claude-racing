@@ -125,6 +125,10 @@ var _skid: AudioStreamPlayer3D
 var _smoke: Array[CPUParticles3D] = []
 ## Пауза між ударами об бар'єр, щоб ковзання вздовж стіни не рахувалось як серія ударів.
 var _barrier_cooldown: float = 0.0
+## Відрив від стіни: гравець кермує від бар'єра — на цей час (с) занос вимикається й зчеплення
+## повертається, щоб машина справді від'їхала, а не ковзала вздовж стіни далі (див. _steering_off_wall).
+var _wall_escape: float = 0.0
+const WALL_ESCAPE_TIME: float = 0.6
 var _barrier_shape: BoxShape3D
 var _barrier_query: PhysicsShapeQueryParameters3D
 var _scraping: bool = false
@@ -384,6 +388,21 @@ func _on_barrier_hit(along: Vector3, normal: Vector3) -> void:
 	var tangent_heading := atan2(-along.x, -along.z)
 	# Наскільки ніс машини відвернутий від напрямку руху вздовж стіни.
 	var misalign := absf(angle_difference(_heading, tangent_heading))
+	if not _reverse_sliding and not _swinging and misalign < deg_to_rad(40.0) and _steering_off_wall(normal):
+		# Гравець кермує від стіни: не вирівнюємо машину вздовж неї й не гасимо поворот
+		# (інакше на постійному повороті, як на «Спіралі», стіна тримала машину, наче рейка).
+		# Лише при невеликому куті до стіни: машину, що влетіла сильно боком, спершу плавно
+		# розвертаємо (_react_to_wall) — інакше зчеплення різко відкидало б її від стіни з втратою швидкості.
+		_wall_escape = WALL_ESCAPE_TIME
+		_swinging = false
+		if _barrier_cooldown <= 0.0:
+			_barrier_cooldown = 0.5
+			var hit := absf(velocity.dot(normal))
+			if hit >= 2.0:
+				Audio.play_at(&"bump", body.global_position, 0.0 if _is_player_car else -6.0)
+				jolted.emit(clampf(hit / 20.0, 0.2, 0.7))
+		_barrier_cooldown = 0.5
+		return
 	if _barrier_cooldown > 0.0:
 		# Продовжуємо тертись об стіну: машина йде вздовж неї, як по напрямній.
 		_barrier_cooldown = 0.5
@@ -403,6 +422,18 @@ func _on_barrier_hit(along: Vector3, normal: Vector3) -> void:
 		return
 	Audio.play_at(&"bump", body.global_position, 0.0 if _is_player_car else -6.0)
 	jolted.emit(clampf(impact / 20.0, 0.2, 0.7))
+
+
+## Чи кермує водій від стіни: кермо повертає ніс у бік дороги, і ніс не дивиться в стіну.
+func _steering_off_wall(normal: Vector3) -> bool:
+	if absf(steer_input) < 0.15:
+		return false
+	var forward := get_forward()
+	forward.y = 0.0
+	forward = forward.normalized()
+	# Куди повертає ніс додатний поворот (ліворуч): UP × forward.
+	var turn_left := Vector3(forward.z, 0.0, -forward.x)
+	return steer_input * turn_left.dot(normal) > 0.0 and forward.dot(normal) > -0.15
 
 
 ## Реакція на стіну, коли ніс відвернутий від руху більш ніж на 20°:
@@ -766,6 +797,7 @@ func respawn(silent: bool = false) -> void:
 	_slow_left = 0.0
 	_spin_left = 0.0
 	_drift = 0.0
+	_wall_escape = 0.0
 	_lateral_speed = 0.0
 	ball.global_position = _spawn.origin + Vector3.UP * BALL_RADIUS
 	_heading = _spawn.basis.get_euler().y
@@ -883,7 +915,12 @@ func _update_drift(speed: float, delta: float) -> void:
 		# Уже в заносі: тримаємось у ньому, поки машину несе боком на пристойній швидкості.
 		if _drift > 0.0 and speed_ratio > 0.35:
 			target = maxf(target, smoothstep(drift_hold_slip * 0.5, drift_hold_slip * 1.5, absf(_lateral_speed)))
-	_drift = move_toward(_drift, target, delta * (4.0 if target > _drift else drift_recovery))
+	if _wall_escape > 0.0:
+		# Відрив від стіни: занос не підхоплюється знову, зчеплення поступово повертається.
+		_wall_escape = maxf(_wall_escape - delta, 0.0)
+		_drift = move_toward(_drift, 0.0, delta * 2.5)
+	else:
+		_drift = move_toward(_drift, target, delta * (4.0 if target > _drift else drift_recovery))
 	if not _grounded:
 		_lateral_speed = 0.0
 
