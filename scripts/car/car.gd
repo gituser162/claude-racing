@@ -136,6 +136,10 @@ var _spark_hold: float = 0.0
 ## Плавний розворот після удару об стіну задом/боком: цільовий курс і чи триває розворот.
 var _swing_target: float = 0.0
 var _swinging: bool = false
+## Ковзання задом уздовж стіни: поки машина треться об бар'єр задом, вона не розвертається
+## (розворот довгої машини біля стіни виштовхував би її — «відкидало»); розворот — лише відірвавшись від стіни.
+var _reverse_sliding: bool = false
+var _reverse_left: float = 0.0
 ## Швидкість такого розвороту (рад/с): 180° приблизно за 0,5 с.
 const SWING_RATE: float = 6.5
 ## Швидкість кулі до кроку фізики: сигнал зіткнення приходить уже після удару.
@@ -383,15 +387,15 @@ func _on_barrier_hit(along: Vector3, normal: Vector3) -> void:
 	if _barrier_cooldown > 0.0:
 		# Продовжуємо тертись об стіну: машина йде вздовж неї, як по напрямній.
 		_barrier_cooldown = 0.5
-		if _swinging or misalign > deg_to_rad(20.0):
-			_start_swing(tangent_heading)
+		if _swinging or _reverse_sliding or misalign > deg_to_rad(20.0):
+			_react_to_wall(tangent_heading, misalign)
 		return
 	var impact := absf(velocity.dot(normal))
 	_barrier_cooldown = 0.5
 	if misalign > deg_to_rad(20.0):
-		# Машина повернута до стіни під кутом, боком чи задом (часто в заносі): без ривка —
-		# плавно розвертається носом за рухом і ковзає далі, зберігаючи швидкість.
-		_start_swing(tangent_heading)
+		# Машина повернута до стіни під кутом, боком чи задом (часто в заносі): без ривка
+		# і без відкидання — див. _react_to_wall.
+		_react_to_wall(tangent_heading, misalign)
 	else:
 		_heading = tangent_heading
 		_yaw_rate = 0.0
@@ -399,6 +403,34 @@ func _on_barrier_hit(along: Vector3, normal: Vector3) -> void:
 		return
 	Audio.play_at(&"bump", body.global_position, 0.0 if _is_player_car else -6.0)
 	jolted.emit(clampf(impact / 20.0, 0.2, 0.7))
+
+
+## Реакція на стіну, коли ніс відвернутий від руху більш ніж на 20°:
+##  - задом (понад 110°) — ковзаємо задом уздовж стіни, лише вирівнюючись паралельно їй;
+##    розвертаємось носом за рухом уже відірвавшись від стіни (див. _update_swing);
+##  - боком — плавно розвертаємось носом за рухом одразу.
+func _react_to_wall(tangent_heading: float, misalign: float) -> void:
+	if misalign > deg_to_rad(110.0):
+		_reverse_sliding = true
+		_reverse_left = 0.25
+		_start_swing(wrapf(tangent_heading + PI, -PI, PI))
+	elif not _reverse_sliding:
+		_start_swing(tangent_heading)
+
+
+## Чи немає бар'єра в колі діаметром із довжину машини (місце, щоб розвернутись на місці).
+func _has_room_to_turn(delta: float) -> bool:
+	var size := maxf(footprint.x, footprint.y) + 0.4
+	_barrier_shape.size = Vector3(size, 0.8, size)
+	var center := ball.global_position + ball.linear_velocity * delta + Vector3.UP * 0.2
+	_barrier_query.transform = Transform3D(Basis.IDENTITY, center)
+	var free := get_world_3d().direct_space_state.intersect_shape(_barrier_query, 1).is_empty()
+	_barrier_shape.size = Vector3(footprint.x, 0.8, footprint.y)
+	return free
+
+
+func is_wall_sliding() -> bool:
+	return _swinging or _reverse_sliding
 
 
 func _start_swing(target: float) -> void:
@@ -411,13 +443,25 @@ func _start_swing(target: float) -> void:
 
 ## Плавний розворот після удару задом (див. _on_barrier_hit). Повертає true, поки триває.
 func _update_swing(delta: float) -> bool:
-	if not _swinging:
+	if _reverse_sliding:
+		_reverse_left = 0.25 if _scraping else _reverse_left - delta
+		# Розвертатись носом за рухом можна лише тоді, коли поруч достатньо місця на повний
+		# оберт (інакше довга машина зачепить стіну під час розвороту, і її відкине).
+		if _reverse_left <= 0.0 and not _has_room_to_turn(delta):
+			_reverse_left = 0.05
+		if _reverse_left <= 0.0:
+			_reverse_sliding = false
+			var flat := Vector3(ball.linear_velocity.x, 0.0, ball.linear_velocity.z)
+			if flat.length() > 3.0:
+				_start_swing(atan2(-flat.x, -flat.z))
+	if not _swinging and not _reverse_sliding:
 		return false
-	_heading = rotate_toward(_heading, _swing_target, SWING_RATE * delta)
+	if _swinging:
+		_heading = rotate_toward(_heading, _swing_target, SWING_RATE * delta)
+		if absf(angle_difference(_heading, _swing_target)) < deg_to_rad(4.0):
+			_swinging = false
 	_drift = maxf(_drift, 0.9)
-	if absf(angle_difference(_heading, _swing_target)) < deg_to_rad(4.0):
-		_swinging = false
-	return _swinging
+	return true
 
 
 ## Робить модель напівпрозорою (amount 0..1), коли вона закриває камері машину гравця.
@@ -714,6 +758,7 @@ func respawn(silent: bool = false) -> void:
 	_yaw_kick = 0.0
 	_yaw_rate = 0.0
 	_swinging = false
+	_reverse_sliding = false
 	_boost_left = 0.0
 	_jumping = false
 	_slow_left = 0.0
@@ -854,7 +899,7 @@ func _drive(forward: Vector3, right: Vector3, velocity: Vector3, speed: float, d
 	elif speed > top_speed + 0.5:
 		# Швидше за ліміт (наприклад, з'їхав на траву) — гальмуємо до нього.
 		accel = -(offroad_decel if _offroad else coast_decel)
-	elif throttle_input > 0.0 and _swinging and speed < 0.0:
+	elif throttle_input > 0.0 and is_wall_sliding() and speed < 0.0:
 		# Розвертаємось після удару задом: газ не гальмує машину, вона котиться далі.
 		accel = 0.0
 	elif throttle_input > 0.0:
@@ -868,9 +913,9 @@ func _drive(forward: Vector3, right: Vector3, velocity: Vector3, speed: float, d
 	var lateral_speed := velocity.dot(right)
 	_lateral_speed = lateral_speed
 	# Під час розвороту після удару задом машина майже не тримає дорогу боком — ковзає, не губить швидкість.
-	var side_grip := 0.15 if _swinging else lerpf(grip, drift_grip, _drift)
+	var side_grip := 0.15 if is_wall_sliding() else lerpf(grip, drift_grip, _drift)
 	var force := forward * accel - right * lateral_speed * side_grip
-	if _drift > 0.0 and not _swinging:
+	if _drift > 0.0 and not is_wall_sliding():
 		force -= forward * signf(speed) * drift_scrub * absf(lateral_speed) * _drift
 	ball.apply_central_force(force * ball.mass)
 

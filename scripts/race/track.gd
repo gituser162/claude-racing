@@ -250,7 +250,9 @@ func _turn_at(offset: float) -> Vector2:
 ## Бар'єри з зовнішнього боку крутих поворотів: там машину, що влетіла занадто швидко,
 ## зупиняє стіна. На пологих поворотах бар'єрів немає — звідти можна вилетіти з естакади.
 func _spawn_barriers() -> void:
-	var step := 3.0
+	# Короткі сегменти: на крутому повороті сусідні мало відрізняються за кутом, тож стіна
+	# майже гладка й не «відштовхує» машину, що ковзає вздовж неї.
+	var step := 1.5
 	# Знаходимо круті ділянки: [початок, кінець, бік повороту].
 	var runs: Array[Vector3] = []
 	var offset := 0.0
@@ -270,7 +272,7 @@ func _spawn_barriers() -> void:
 	var block := BoxMesh.new()
 	block.size = Vector3(0.45, 0.95, step)
 	var stripe := BoxMesh.new()
-	stripe.size = Vector3(0.47, 0.14, step * 0.5)
+	stripe.size = Vector3(0.47, 0.14, step)
 	var concrete := _psx_material(Color(0.32, 0.31, 0.34))
 	var shape := BoxShape3D.new()
 	shape.size = Vector3(0.6, 1.4, step + 0.1)
@@ -296,8 +298,7 @@ func _spawn_barriers() -> void:
 			wall.add_child(segment)
 			_add_mesh(segment, block, concrete, Vector3(0.0, 0.47, 0.0))
 			# Смуги-«зебра»: неон і біле по черзі, щоб поворот читався здалеку.
-			_add_mesh(segment, stripe, neon_mat, Vector3(0.0, 0.78, -step * 0.25))
-			_add_mesh(segment, stripe, white_mat, Vector3(0.0, 0.78, step * 0.25))
+			_add_mesh(segment, stripe, neon_mat if i % 2 == 0 else white_mat, Vector3(0.0, 0.78, 0.0))
 			var collider := CollisionShape3D.new()
 			collider.shape = shape
 			collider.transform = t.translated_local(Vector3(0.0, 0.7, 0.0))
