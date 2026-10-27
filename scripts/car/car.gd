@@ -48,6 +48,17 @@ var footprint: Vector2 = Vector2(1.7, 2.9)
 ## Як швидко гальмує, якщо заїхав на траву швидше за ліміт.
 @export var offroad_decel: float = 14.0
 
+@export_group("Занос")
+## З якої частки макс. швидкості й якого відхилення керма машину починає заносити.
+@export var drift_speed_start: float = 0.72
+@export var drift_steer_start: float = 0.55
+## Бокове зчеплення в повному заносі (звичайне — grip). Менше — довше ковзає вбік.
+@export var drift_grip: float = 3.5
+## У заносі машина повертається трохи сильніше — «хвіст» виносить назовні.
+@export var drift_turn_boost: float = 1.25
+## Втрата швидкості від бокового ковзання.
+@export var drift_scrub: float = 0.35
+
 @export_group("Вигляд")
 @export var max_wheel_angle: float = 0.45
 @export var max_body_roll: float = 0.09
@@ -92,6 +103,11 @@ var _paint_meshes: Array[MeshInstance3D] = []
 var skills: SkillController
 var _trail: MeshInstance3D
 var _engine: AudioStreamPlayer3D
+## Сила заносу 0..1 і поточна бокова швидкість (для диму й звуку шин).
+var _drift: float = 0.0
+var _lateral_speed: float = 0.0
+var _skid: AudioStreamPlayer3D
+var _smoke: Array[CPUParticles3D] = []
 var _is_player_car: bool = false
 var _air_time: float = 0.0
 var _ground_normal: Vector3 = Vector3.UP
@@ -125,6 +141,13 @@ func _ready() -> void:
 	_engine.volume_db = -9.0 if _is_player_car else -18.0
 	body.add_child(_engine)
 	_engine.play()
+	_skid = AudioStreamPlayer3D.new()
+	_skid.name = "Skid"
+	_skid.stream = Audio.get_sound(&"skid_loop")
+	_skid.bus = &"SFX"
+	_skid.unit_size = 6.0
+	_skid.max_distance = 70.0
+	body.add_child(_skid)
 	_slow_ring = _make_slow_ring()
 	body.add_child(_slow_ring)
 	_trail = load("res://scripts/car/light_trail.gd").new()
@@ -182,6 +205,7 @@ func _load_model(scene: PackedScene) -> void:
 	_jet_flame.scale = _underglow.scale
 	_shield.scale = Vector3(footprint.x * 0.75, 1.0, footprint.y * 0.62)
 	_build_headlights()
+	_build_drift_fx()
 
 
 ## Промені фар: два світлові конуси попереду машини (видно в тумані й дощі).
@@ -215,6 +239,45 @@ func _build_headlights() -> void:
 		beam.position = source - top_dir * length * 0.5
 		beam.rotation.x = tilt
 		holder.add_child(beam)
+
+
+## Дим із-під задніх коліс (вмикається в заносі, див. _animate).
+func _build_drift_fx() -> void:
+	for old: CPUParticles3D in _smoke:
+		old.queue_free()
+	_smoke.clear()
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3.ONE * 0.35
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.vertex_color_use_as_albedo = true
+	mesh.material = mat
+	var fade := Gradient.new()
+	fade.set_color(0, Color(0.75, 0.72, 0.82, 0.45))
+	fade.set_color(1, Color(0.6, 0.55, 0.7, 0.0))
+	var grow := Curve.new()
+	grow.add_point(Vector2(0.0, 0.6))
+	grow.add_point(Vector2(1.0, 2.2))
+	for side: float in [-1.0, 1.0]:
+		var smoke := CPUParticles3D.new()
+		smoke.mesh = mesh
+		smoke.amount = 28
+		smoke.lifetime = 0.8
+		smoke.emitting = false
+		smoke.local_coords = false
+		smoke.direction = Vector3(0.0, 1.0, 0.6)
+		smoke.spread = 50.0
+		smoke.initial_velocity_min = 0.6
+		smoke.initial_velocity_max = 1.6
+		smoke.gravity = Vector3(0.0, 0.8, 0.0)
+		smoke.angular_velocity_min = -90.0
+		smoke.angular_velocity_max = 90.0
+		smoke.scale_amount_curve = grow
+		smoke.color_ramp = fade
+		smoke.position = Vector3(side * footprint.x * 0.4, 0.2, footprint.y * 0.42)
+		body.add_child(smoke)
+		_smoke.append(smoke)
 
 
 ## Справжнє світло фар (SpotLight) — лише для машини гравця, щоб не навантажувати рендер.
@@ -423,6 +486,8 @@ func respawn(silent: bool = false) -> void:
 	_jumping = false
 	_slow_left = 0.0
 	_spin_left = 0.0
+	_drift = 0.0
+	_lateral_speed = 0.0
 	ball.global_position = _spawn.origin + Vector3.UP * BALL_RADIUS
 	_heading = _spawn.basis.get_euler().y
 	_smoothed_up = Vector3.UP
@@ -464,6 +529,7 @@ func _physics_process(delta: float) -> void:
 		# Під час розкрутки керування не працює.
 		throttle_input = 0.0
 		steer_input = 0.0
+	_update_drift(speed, delta)
 	_steer(speed, delta)
 	if _yaw_kick != 0.0:
 		_heading += _yaw_kick * delta
@@ -516,7 +582,21 @@ func _steer(speed: float, delta: float) -> void:
 	var high_speed_factor := lerpf(1.0, high_speed_turn_factor, clampf(absf(speed) / max_speed, 0.0, 1.0))
 	var direction := -1.0 if speed < -0.5 else 1.0
 	var air := 1.0 if _grounded else (_jump_air_steer if _jumping else air_steer_factor)
-	_heading += steer_input * turn_speed * _steer_multiplier * speed_factor * high_speed_factor * direction * air * delta
+	var drift_turn := 1.0 + (drift_turn_boost - 1.0) * _drift
+	_heading += steer_input * turn_speed * _steer_multiplier * speed_factor * high_speed_factor * direction * air * drift_turn * delta
+
+
+## Занос: на великій швидкості й при сильному повороті бокове зчеплення слабшає,
+## машину виносить назовні повороту. Відпустив кермо чи скинув швидкість — зчеплення повертається.
+func _update_drift(speed: float, delta: float) -> void:
+	var target := 0.0
+	if _grounded and not is_spinning() and speed > 0.0:
+		var speed_ratio := speed / maxf(max_speed, 0.1)
+		target = smoothstep(drift_speed_start, drift_speed_start + 0.15, speed_ratio) \
+			* smoothstep(drift_steer_start, 1.0, absf(steer_input))
+	_drift = move_toward(_drift, target, delta * (4.0 if target > _drift else 2.5))
+	if not _grounded:
+		_lateral_speed = 0.0
 
 
 func _drive(forward: Vector3, right: Vector3, velocity: Vector3, speed: float, delta: float) -> void:
@@ -541,7 +621,10 @@ func _drive(forward: Vector3, right: Vector3, velocity: Vector3, speed: float, d
 		accel = -signf(speed) * minf(coast_decel, absf(speed) / delta)
 
 	var lateral_speed := velocity.dot(right)
-	var force := forward * accel - right * lateral_speed * grip
+	_lateral_speed = lateral_speed
+	var force := forward * accel - right * lateral_speed * lerpf(grip, drift_grip, _drift)
+	if _drift > 0.0:
+		force -= forward * signf(speed) * drift_scrub * absf(lateral_speed) * _drift
 	ball.apply_central_force(force * ball.mass)
 
 
@@ -579,3 +662,14 @@ func _animate(speed: float, delta: float) -> void:
 		wheel.rotation.y = lerpf(wheel.rotation.y, steer_input * max_wheel_angle, 1.0 - exp(-15.0 * delta))
 	for spin: Node3D in _wheel_spins:
 		spin.rotation.x = wrapf(spin.rotation.x - speed / 0.35 * delta, -PI, PI)
+	# Дим з-під задніх коліс і вереск шин, поки машину несе вбік.
+	var slide := clampf((absf(_lateral_speed) - 2.0) / 6.0, 0.0, 1.0) if _grounded else 0.0
+	for smoke: CPUParticles3D in _smoke:
+		smoke.emitting = slide > 0.15
+	if slide > 0.05:
+		_skid.volume_db = linear_to_db(slide) + (-8.0 if _is_player_car else -16.0)
+		_skid.pitch_scale = 0.9 + slide * 0.2
+		if not _skid.playing:
+			_skid.play()
+	elif _skid.playing:
+		_skid.stop()

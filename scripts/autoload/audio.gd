@@ -27,6 +27,7 @@ const SFX: Dictionary = {
 	&"rain_loop": preload("res://assets/audio/sfx/rain_loop.wav"),
 	&"respawn": preload("res://assets/audio/sfx/respawn.wav"),
 	&"shield": preload("res://assets/audio/sfx/shield.wav"),
+	&"skid_loop": preload("res://assets/audio/sfx/skid_loop.wav"),
 	&"slow": preload("res://assets/audio/sfx/slow.wav"),
 	&"spin": preload("res://assets/audio/sfx/spin.wav"),
 	&"teleport": preload("res://assets/audio/sfx/teleport.wav"),
