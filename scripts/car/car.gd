@@ -121,6 +121,14 @@ var _skid: AudioStreamPlayer3D
 var _smoke: Array[CPUParticles3D] = []
 ## Пауза між ударами об бар'єр, щоб ковзання вздовж стіни не рахувалось як серія ударів.
 var _barrier_cooldown: float = 0.0
+var _barrier_shape: BoxShape3D
+var _barrier_query: PhysicsShapeQueryParameters3D
+var _scraping: bool = false
+var _scrape_point: Vector3
+var _scrape_normal: Vector3
+var _sparks: CPUParticles3D
+## Іскри ще трохи сиплються після останнього дотику, щоб не мерехтіли.
+var _spark_hold: float = 0.0
 ## Швидкість кулі до кроку фізики: сигнал зіткнення приходить уже після удару.
 var _prev_velocity: Vector3 = Vector3.ZERO
 var _is_player_car: bool = false
@@ -165,10 +173,12 @@ func _ready() -> void:
 	body.add_child(_skid)
 	_slow_ring = _make_slow_ring()
 	body.add_child(_slow_ring)
-	# Удари об бар'єри: потрібен список контактів кулі.
-	ball.contact_monitor = true
-	ball.max_contacts_reported = 4
-	ball.body_shape_entered.connect(_on_ball_shape_entered)
+	# Куля теж не проходить крізь бар'єри (запобіжник), але основну перевірку робить контур кузова.
+	ball.collision_mask |= Track.BARRIER_LAYER
+	_barrier_shape = BoxShape3D.new()
+	_barrier_query = PhysicsShapeQueryParameters3D.new()
+	_barrier_query.shape = _barrier_shape
+	_barrier_query.collision_mask = Track.BARRIER_LAYER
 	_trail = load("res://scripts/car/light_trail.gd").new()
 	_trail.name = "LightTrail"
 	_trail.car = self
@@ -225,6 +235,7 @@ func _load_model(scene: PackedScene) -> void:
 	_shield.scale = Vector3(footprint.x * 0.75, 1.0, footprint.y * 0.62)
 	_build_headlights()
 	_build_drift_fx()
+	_build_sparks()
 
 
 ## Промені фар: два світлові конуси попереду машини (видно в тумані й дощі).
@@ -260,27 +271,66 @@ func _build_headlights() -> void:
 		holder.add_child(beam)
 
 
-## Удар об бар'єр (група «barrier»): втрата швидкості пропорційно до сили удару,
-## машину частково розвертає вздовж стіни, камеру трусить.
-func _on_ball_shape_entered(_rid: RID, other: Node, shape_index: int, _local_shape: int) -> void:
-	if other == null or not other.is_in_group(&"barrier") or _barrier_cooldown > 0.0:
+## Бар'єри: перевіряємо контур кузова (коробка розміром з машину), а не лише кулю фізики,
+## щоб кузов не заходив у стіну. Якщо зайшов — виштовхуємо, гасимо швидкість у стіну.
+## Перший дотик після паузи — «удар»: втрата швидкості за силою удару, розворот уздовж стіни, трусіння.
+## Поки треться об стіну — іскри.
+func _check_barriers(delta: float) -> void:
+	_scraping = false
+	_barrier_shape.size = Vector3(footprint.x, 0.8, footprint.y)
+	var forward := get_forward()
+	var right := Vector3(-forward.z, 0.0, forward.x)
+	# Перевіряємо положення, де машина буде ПІСЛЯ кроку фізики (інакше на швидкості
+	# кут кузова встигає зайти в стіну на кадр).
+	var center := ball.global_position + ball.linear_velocity * delta + Vector3.UP * 0.2
+	_barrier_query.transform = Transform3D(Basis(right, Vector3.UP, -forward), center)
+	var hits := get_world_3d().direct_space_state.intersect_shape(_barrier_query, 4)
+	for hit: Dictionary in hits:
+		var wall := hit.collider as CollisionObject3D
+		if wall == null:
+			continue
+		var shape_node := wall.shape_owner_get_owner(wall.shape_find_owner(hit.shape)) as CollisionShape3D
+		if shape_node == null:
+			continue
+		var along := shape_node.global_basis.z
+		along.y = 0.0
+		along = along.normalized()
+		# Нормаль стіни — у бік машини (до дороги).
+		var normal := along.cross(Vector3.UP)
+		if (center - shape_node.global_position).dot(normal) < 0.0:
+			normal = -normal
+		var half_thickness: float = (shape_node.shape as BoxShape3D).size.x * 0.5
+		var face := shape_node.global_position + normal * half_thickness
+		# Наскільки кузов виступає в бік стіни від центру машини.
+		var extent := absf(normal.dot(right)) * footprint.x * 0.5 + absf(normal.dot(forward)) * footprint.y * 0.5
+		var depth := extent - (center - face).dot(normal)
+		if depth <= 0.0:
+			continue
+		ball.global_position += normal * depth
+		var into := ball.linear_velocity.dot(normal)
+		if into < 0.0:
+			ball.linear_velocity -= normal * into
+		_on_barrier_hit(along, normal)
+		_scraping = true
+		_scrape_point = center - normal * extent
+		_scrape_normal = normal
+	if not _scraping:
+		_barrier_cooldown = maxf(_barrier_cooldown - delta, 0.0)
+
+
+func _on_barrier_hit(along: Vector3, normal: Vector3) -> void:
+	if _barrier_cooldown > 0.0:
+		_barrier_cooldown = 0.5
 		return
-	var owner_id: int = (other as CollisionObject3D).shape_find_owner(shape_index)
-	var shape_node := (other as CollisionObject3D).shape_owner_get_owner(owner_id) as Node3D
-	if shape_node == null:
-		return
-	var along := shape_node.global_basis.z
-	along.y = 0.0
-	along = along.normalized()
 	var velocity := _prev_velocity
 	velocity.y = 0.0
 	if velocity.dot(along) < 0.0:
 		along = -along
-	var impact := absf(velocity.dot(along.cross(Vector3.UP)))
+	var impact := absf(velocity.dot(normal))
+	_barrier_cooldown = 0.5
 	if impact < 2.0:
 		return
-	_barrier_cooldown = 0.5
-	# Складову швидкості в стіну вже погасила фізика; зверху — невеликий штраф за удар (до 30%).
+	# Складову швидкості в стіну вже погашено; зверху — невеликий штраф за удар (до 30%).
 	var loss := clampf(impact / 80.0, 0.05, 0.3)
 	ball.linear_velocity *= 1.0 - loss
 	# Ковзний удар — машина стає вздовж стіни й ковзає далі; майже лобовий — розвертає частково.
@@ -290,6 +340,38 @@ func _on_ball_shape_entered(_rid: RID, other: Node, shape_index: int, _local_sha
 	_yaw_rate = 0.0
 	Audio.play_at(&"bump", body.global_position, 0.0 if _is_player_car else -6.0)
 	jolted.emit(clampf(impact / 20.0, 0.2, 0.7))
+
+
+## Іскри від тертя об бар'єр (вмикаються в _animate, поки машина треться об стіну).
+func _build_sparks() -> void:
+	if _sparks:
+		_sparks.queue_free()
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(0.1, 0.1, 0.45)
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mat.vertex_color_use_as_albedo = true
+	mat.disable_fog = true
+	mesh.material = mat
+	var fade := Gradient.new()
+	fade.set_color(0, Color(2.0, 1.8, 1.0))
+	fade.add_point(0.4, Color(1.8, 0.9, 0.2))
+	fade.set_color(fade.get_point_count() - 1, Color(0.6, 0.1, 0.0))
+	_sparks = CPUParticles3D.new()
+	_sparks.name = "Sparks"
+	_sparks.mesh = mesh
+	_sparks.amount = 80
+	_sparks.lifetime = 0.35
+	_sparks.local_coords = false
+	_sparks.emitting = false
+	_sparks.top_level = true
+	_sparks.spread = 35.0
+	_sparks.initial_velocity_min = 4.0
+	_sparks.initial_velocity_max = 11.0
+	_sparks.gravity = Vector3(0.0, -18.0, 0.0)
+	_sparks.color_ramp = fade
+	body.add_child(_sparks)
 
 
 ## Дим із-під задніх коліс (вмикається в заносі, див. _animate).
@@ -591,6 +673,7 @@ func _physics_process(delta: float) -> void:
 			_yaw_kick = 0.0
 	if _grounded and not (_jumping and _jump_grace > 0.0):
 		_drive(forward, right, velocity, speed, delta)
+	_check_barriers(delta)
 
 	if ball.global_position.y < fall_limit_y:
 		respawn()
@@ -601,7 +684,6 @@ func _physics_process(delta: float) -> void:
 
 
 func _tick_effects(delta: float) -> void:
-	_barrier_cooldown = maxf(_barrier_cooldown - delta, 0.0)
 	_slow_left = maxf(_slow_left - delta, 0.0)
 	_protect_left = maxf(_protect_left - delta, 0.0)
 	_ghost_left = maxf(_ghost_left - delta, 0.0)
@@ -723,6 +805,18 @@ func _animate(speed: float, delta: float) -> void:
 		wheel.rotation.y = lerpf(wheel.rotation.y, steer_input * max_wheel_angle, 1.0 - exp(-15.0 * delta))
 	for spin: Node3D in _wheel_spins:
 		spin.rotation.x = wrapf(spin.rotation.x - speed / 0.35 * delta, -PI, PI)
+	# Іскри від тертя об бар'єр: летять назад відносно руху й від стіни.
+	var scrape_speed := ball.linear_velocity.length()
+	if _scraping and scrape_speed > 5.0:
+		_spark_hold = 0.15
+	else:
+		_spark_hold = maxf(_spark_hold - delta, 0.0)
+	_sparks.emitting = _spark_hold > 0.0
+	if _scraping and scrape_speed > 5.0:
+		_sparks.global_position = _scrape_point + Vector3.UP * 0.3
+		var back := -ball.linear_velocity.normalized()
+		_sparks.direction = (back + _scrape_normal * 0.4 + Vector3.UP * 0.5).normalized()
+		_sparks.speed_scale = clampf(scrape_speed / 25.0, 0.6, 1.4)
 	# Дим з-під задніх коліс і вереск шин, поки машину несе вбік.
 	var slide := clampf((absf(_lateral_speed) - 2.0) / 6.0, 0.0, 1.0) if _grounded else 0.0
 	for smoke: CPUParticles3D in _smoke:

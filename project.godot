@@ -32,13 +32,6 @@ window/stretch/mode="canvas_items"
 
 theme/custom="res://resources/ui/neon_theme.tres"
 
-[shader_globals]
-
-psx_detail={
-"type": "sampler2D",
-"value": "res://assets/textures/detail.png"
-}
-
 [input]
 
 accelerate={
@@ -100,6 +93,7 @@ pause={
 3d_physics/layer_2="cars"
 3d_physics/layer_3="checkpoints"
 3d_physics/layer_4="skills"
+3d_physics/layer_5="barriers"
 
 [physics]
 
@@ -115,3 +109,10 @@ renderer/rendering_method.mobile="gl_compatibility"
 textures/default_filters/use_nearest_mipmap_filter=true
 anti_aliasing/quality/msaa_3d=1
 anti_aliasing/quality/msaa_3d.web=0
+
+[shader_globals]
+
+psx_detail={
+"type": "sampler2D",
+"value": "res://assets/textures/detail.png"
+}

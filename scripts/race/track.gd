@@ -35,6 +35,8 @@ const ADS: Array[String] = [
 	"КАПІБАРА-СПА\nСПОКІЙ І ВАННА", "КОТИ — РІДИНА\nДОВЕДЕНО", "КРЕДИТ\nЗА 5 ХВ*", "ПЕРЕКУС\nНА ОРБІТІ",
 ]
 
+## Фізичний шар бар'єрів (5-й, «barriers»): машини перевіряють його своїм контуром.
+const BARRIER_LAYER: int = 1 << 4
 const PSX_SHADER: Shader = preload("res://resources/shaders/psx.gdshader")
 const BUILDING_SHADER: Shader = preload("res://resources/shaders/psx_building.gdshader")
 const NEON_COLORS: Array[Color] = [
@@ -282,7 +284,7 @@ func _spawn_barriers() -> void:
 		white_mat.set_shader_parameter(&"detail_strength", 0.0)
 		var wall := StaticBody3D.new()
 		wall.name = "Barrier"
-		wall.collision_layer = 1
+		wall.collision_layer = BARRIER_LAYER
 		wall.collision_mask = 0
 		wall.add_to_group(&"barrier")
 		holder.add_child(wall)
