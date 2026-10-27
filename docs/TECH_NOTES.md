@@ -21,8 +21,8 @@
 | Гонка | `scenes/main.tscn` + `scripts/main.gd` | фази, чекпоінти, місця, HUD, результати, прозорість машин, що закривають огляд (`_update_see_through`), динаміка (`RaceDynamics`) |
 | Машина | `scenes/car/car.tscn` + `scripts/car/car.gd` (Car) | фізика — куля RigidBody (r 0,5) + видимий Body (top_level); курс `_heading`; занос (`drift_*`), бар'єри (`_check_barriers` контуром кузова), розворот біля стіни (`_swinging`, `_reverse_sliding`), фари, дим, іскри, `race_speed_multiplier` |
 | Динаміка гонки | `scripts/race/race_dynamics.gd` | множники макс. швидкості відносно гравця: зграя, хаос, наздоганяння |
-| Траса | `scripts/race/track.gd` (Track) | крива `TrackPath`, `get_transform_at(offset, lateral, height)`, `get_offset_of`, місто, ліхтарі, бар'єри (`barrier_mode`), арки, білборди; `elevated`, `frontage_buildings`, `keep_clear`; виклик `build_features()` у дочірніх вузлах |
-| Мапи | `resources/maps/*.tres` (MapData) → `scenes/track/*.tscn` | естакада `test_track.tscn`, вулиця `city_street.tscn` (+ `street_features.gd`) |
+| Траса | `scripts/race/track.gd` (Track) | крива `TrackPath`, `get_transform_at(offset, lateral, height)`, `get_offset_of`, `wrap_offset`, `signed_gap` (відстань уздовж траси — для кола й спринту), `is_off_road`, `get_floor`; місто, ліхтарі, бар'єри (`barrier_mode`), арки, білборди; `elevated`, `frontage_buildings`, `keep_clear`, `menu_showcase`; тип: `closed`, `start_offset`, `finish_runout`, `finish_checkpoint`; виклик `build_features()` у дочірніх вузлах |
+| Мапи | `resources/maps/*.tres` (MapData, `laps`) → `scenes/track/*.tscn` | естакада `test_track.tscn`, вулиця `city_street.tscn` (+ `street_features.gd`), спринт-вежа `spiral_tower.tscn` (+ `spiral_features.gd`); кількість кіл — `Game.laps` |
 | Боти | `scripts/race/bot_driver.gd` | lookahead, безпечна швидкість за кривизною, обгін, антизастрягання, скіли |
 | Зіткнення машин | `scripts/race/car_collisions.gd` | власний OBB SAT, пріоритет ваги |
 | Скіли | `scripts/skills/` (Skill, SkillController, Hazard) | гонщики — `resources/racers/*.tres` + `scenes/racers/<id>/model.tscn` (див. `docs/ADDING_RACERS.md`) |
@@ -47,6 +47,9 @@
 - **Unshaded/additive матеріали (промені, сяйво) з туманом** додають колір туману — `fog_disabled`.
 - **Перед експортом після синхронізації uid** — видалити `.godot/exported`, інакше в збірці попередження про недійсні uid.
 - **Меню:** `set_input_as_handled()` викликати до зміни сцени (після — меню вже не в дереві).
+- **Траса, що проходить над собою:** `CSGPolygon3D` з `PATH_ROTATION_PATH_FOLLOW` на спіралі накопичує крен (рамка без обертання) — дорога перекручується. Для таких трас `path_rotation = PATH` (переріз завжди горизонтальний). `Curve3D.get_closest_offset` — у 3D, тож на сусідніх витках (≥ 11 м) машина «чіпляється» до свого.
+- **Не замкнена траса:** `fposmod(offset, length)` перекидає кінець на початок — для спринту всі офсети через `Track.wrap_offset`/`signed_gap`; `CSGPolygon3D.path_joined = false`. Машина, що стоїть на самому краю кривої, скочується з плити — сітка має бути повністю на дорозі.
+- **Вікна в `psx_building.gdshader`** — лише вище `ground_y + 1,5 м` (цоколь); для міста на землі нижче нуля задати `ground_y`.
 - **Мережа середовища Claude:** github raw/api закриті; `git clone` працює; шаблони експорту качаються діапазонами з release-assets.
 
 ## Збірка (коли автор попросить)

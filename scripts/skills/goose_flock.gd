@@ -51,11 +51,11 @@ func _physics_process(delta: float) -> void:
 	var flap := sin(Time.get_ticks_msec() / 60.0)
 	for goose: Node3D in _geese:
 		goose.get_node("Wing").rotation.z = flap * 0.5
-	var my_offset := fposmod(start_offset + _travelled, track.length)
+	var my_offset := track.wrap_offset(start_offset + _travelled)
 	for car: Car in source_car.skills.cars:
 		if car == source_car or car in _hit:
 			continue
-		var d := fposmod(track.get_offset_of(car.body.global_position) - my_offset + track.length * 0.5, track.length) - track.length * 0.5
+		var d := track.signed_gap(my_offset, track.get_offset_of(car.body.global_position))
 		if absf(d) < 4.0:
 			_hit.append(car)
 			car.spin_out(1.0)

@@ -14,6 +14,8 @@ const LANE_LIMIT: float = 5.0
 const BRAKE_FOR_PLANNING: float = 18.0
 
 var active: bool = true
+## Після фінішу на трасі-спринті: далі тримаємо дорогу, але лише гальмуємо до зупинки.
+var brake_to_stop: bool = false
 var car: Car
 var track: Track
 var others: Array[Car] = []
@@ -60,6 +62,11 @@ func _physics_process(delta: float) -> void:
 	var forward := car.get_forward()
 	var angle := atan2(forward.cross(to_target).y, forward.dot(to_target))
 	car.steer_input = clampf(angle * 2.5, -1.0, 1.0)
+
+	if brake_to_stop:
+		# М'яке гальмування (~10 м/с²): зупинка за 50–70 м, у межах зони за фінішем.
+		car.throttle_input = -0.35 if speed > 0.5 else 0.0
+		return
 
 	# Газ/гальмо: тримаємо безпечну швидкість для поворотів попереду.
 	var target_speed := _safe_speed(offset)

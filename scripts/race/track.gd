@@ -12,6 +12,22 @@ signal checkpoint_passed(car: Car, index: int)
 ## false — вулиця на рівні землі (без опор, місто навколо траси).
 @export var elevated: bool = true
 
+@export_group("Тип траси")
+## true — замкнене коло (старт = фініш); false — «спринт» від старту до фінішу (див. start_offset, finish_runout).
+@export var closed: bool = true
+## Спринт: де на кривій лінія старту, м від початку кривої (позаду неї — стартова сітка).
+@export var start_offset: float = 0.0
+## Спринт: скільки кривої лишається після лінії фінішу (зона гальмування), м.
+@export var finish_runout: float = 0.0
+## Машина нижче цієї висоти — респаун (для високих трас — нижче землі міста).
+@export var fall_limit_y: float = -12.0
+## Респаун, щойно машина опинилась далеко збоку від дороги (вилетіла за відбійник у прірву).
+@export var respawn_off_road: bool = false
+## Висота поверху, м (0 — без поверхів). Тоді на HUD замість кола — поверх (див. get_floor).
+@export var floor_height: float = 0.0
+## Висота підлоги першого поверху (землі під вежею).
+@export var floor_base_y: float = 0.0
+
 @export_group("Місто")
 @export var city_seed: int = 7
 @export var building_count: int = 260
@@ -32,6 +48,8 @@ signal checkpoint_passed(car: Car, index: int)
 @export var sidewalk_width: float = 5.0
 ## Зони без забудови: (x, z, радіус) — наприклад, площа всередині повороту.
 @export var keep_clear: PackedVector3Array = PackedVector3Array()
+## Де в меню стоїть подіум з моделлю гонщика (на дорозі біля старту).
+@export var menu_showcase: Vector3 = Vector3(0.0, 0.0, -30.0)
 
 @export_group("Бар'єри")
 ## SHARP_CORNERS — лише із зовнішнього боку крутих поворотів (естакада);
@@ -63,6 +81,12 @@ const NEON_COLORS: Array[Color] = [
 var _facade_spots: Array[Dictionary] = []
 var curve: Curve3D
 var length: float
+## Відстань від початку кривої до лінії фінішу (для кола — уся довжина).
+var finish_offset: float
+## Номер чекпоінта, проїзд якого завершує коло: 0 (лінія старту) для кола, останній — для спринту.
+var finish_checkpoint: int = 0
+## Як повертати перетин смуг уздовж кривої — так само, як дорога (Road), щоб відбійники лягали рівно.
+var _strip_rotation: CSGPolygon3D.PathRotation = CSGPolygon3D.PATH_ROTATION_PATH_FOLLOW
 
 @onready var path: Path3D = $TrackPath
 
@@ -70,19 +94,31 @@ var length: float
 func _ready() -> void:
 	curve = path.curve
 	length = curve.get_baked_length()
+	if closed:
+		start_offset = 0.0
+		finish_offset = length
+	else:
+		finish_offset = length - finish_runout
+		finish_checkpoint = checkpoint_count - 1
+	var road := get_node_or_null(^"Road") as CSGPolygon3D
+	if road:
+		_strip_rotation = road.path_rotation
 	_build_checkpoints()
 	if frontage_buildings:
 		_spawn_frontage()
 	_spawn_city()
-	if elevated:
+	if elevated and pillar_spacing > 0.0:
 		_spawn_pillars()
-	_spawn_lamps()
+	if lamp_spacing > 0.0:
+		_spawn_lamps()
 	if barrier_mode == BarrierMode.FULL:
 		_spawn_full_barriers()
 	else:
 		_spawn_barriers()
-	_spawn_arches()
-	_spawn_billboards()
+	if arch_spacing > 0.0:
+		_spawn_arches()
+	if billboard_spacing > 0.0:
+		_spawn_billboards()
 	var traffic: Node3D = load("res://scripts/race/sky_traffic.gd").new()
 	traffic.name = "SkyTraffic"
 	add_child(traffic)
@@ -95,11 +131,15 @@ func _ready() -> void:
 
 ## Точка на центрі дороги через `offset` метрів від старту, повернута за ходом руху.
 ## `lateral` зсуває вбік (+ праворуч), `height` — вгору.
+## На спринті offset обмежується початком і кінцем кривої (за ними траса не продовжується).
 func get_transform_at(offset: float, lateral: float = 0.0, height: float = 0.0) -> Transform3D:
-	offset = fposmod(offset, length)
+	offset = wrap_offset(offset)
 	var pos := path.to_global(curve.sample_baked(offset, true))
-	var ahead := path.to_global(curve.sample_baked(fposmod(offset + 2.0, length), true))
-	var dir := ahead - pos
+	var dir: Vector3
+	if closed or offset + 2.0 <= length:
+		dir = path.to_global(curve.sample_baked(wrap_offset(offset + 2.0), true)) - pos
+	else:
+		dir = pos - path.to_global(curve.sample_baked(offset - 2.0, true))
 	dir.y = 0.0
 	var heading := atan2(-dir.x, -dir.z)
 	var basis := Basis(Vector3.UP, heading)
@@ -111,8 +151,39 @@ func get_offset_of(world_pos: Vector3) -> float:
 	return curve.get_closest_offset(path.to_local(world_pos))
 
 
+## Offset у межах траси: для кола — по колу, для спринту — між початком і кінцем.
+func wrap_offset(offset: float) -> float:
+	return fposmod(offset, length) if closed else clampf(offset, 0.0, length)
+
+
+## На скільки метрів уздовж траси `to` попереду `from` (від'ємне — позаду).
+## На колі береться коротший шлях (не більше півкола), на спринті — пряма різниця.
+func signed_gap(from: float, to: float) -> float:
+	if not closed:
+		return to - from
+	var d := fposmod(to - from, length)
+	return d if d <= length * 0.5 else d - length
+
+
+## Чи вилетіла машина за межі дороги (далеко вбік або сильно нижче дороги).
+func is_off_road(world_pos: Vector3) -> bool:
+	var t := get_transform_at(get_offset_of(world_pos))
+	var local := world_pos - t.origin
+	return absf(local.dot(t.basis.x)) > road_width * 0.5 + 2.5 or local.y < -6.0
+
+
+## Номер поверху для точки (1 — перший). Лише для трас із floor_height > 0.
+func get_floor(world_pos: Vector3) -> int:
+	if floor_height <= 0.0:
+		return 0
+	return maxi(floori((world_pos.y - floor_base_y) / floor_height + 0.01) + 1, 1)
+
+
 func get_checkpoint_offset(index: int) -> float:
-	return index * length / checkpoint_count
+	if closed:
+		return index * length / checkpoint_count
+	# Спринт: від лінії старту (0) до лінії фінішу (останній) рівними відрізками.
+	return start_offset + index * (finish_offset - start_offset) / (checkpoint_count - 1)
 
 
 func get_checkpoint_transform(index: int) -> Transform3D:
@@ -131,8 +202,8 @@ func _build_checkpoints() -> void:
 		area.monitorable = false
 		var shape := CollisionShape3D.new()
 		var box := BoxShape3D.new()
-		# Лінія старту ширша, щоб її не можна було об'їхати.
-		var width := road_width * (3.0 if i == 0 else 1.6)
+		# Лінії старту й фінішу ширші, щоб їх не можна було об'їхати.
+		var width := road_width * (3.0 if i == 0 or i == finish_checkpoint else 1.6)
 		box.size = Vector3(width, 10.0, 4.0)
 		shape.shape = box
 		area.add_child(shape)
@@ -440,11 +511,11 @@ func _add_path_strip(parent: Node3D, profile: PackedVector2Array, material: Mate
 	strip.path_interval_type = CSGPolygon3D.PATH_INTERVAL_DISTANCE
 	strip.path_interval = 1.5
 	strip.path_simplify_angle = 0.0
-	strip.path_rotation = CSGPolygon3D.PATH_ROTATION_PATH_FOLLOW
+	strip.path_rotation = _strip_rotation
 	strip.path_local = false
 	strip.path_continuous_u = true
 	strip.path_u_distance = 4.0
-	strip.path_joined = true
+	strip.path_joined = closed
 	strip.material = material
 	return strip
 

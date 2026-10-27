@@ -1,7 +1,8 @@
 extends Node
 ## Глобальний стан гри (autoload «Game»): налаштування гонки, список гонщиків і мап, вибір гравця.
 
-const LAPS: int = 3
+## Кіл у гонці за замовчуванням; конкретна мапа може задати своє (MapData.laps).
+const DEFAULT_LAPS: int = 3
 ## Ботів на трасі: щонайменше 1 і не більше, ніж решта гонщиків (кожен гонщик — один раз),
 ## але не більше MAX_BOTS (стільки місць у стартовій сітці й кольорів ботів).
 const MIN_BOTS: int = 1
@@ -26,6 +27,7 @@ const RACER_PATHS: PackedStringArray = [
 const MAP_PATHS: PackedStringArray = [
 	"res://resources/maps/01_neon_overpass.tres",
 	"res://resources/maps/02_city_street.tres",
+	"res://resources/maps/03_spiral.tres",
 ]
 
 var RACERS: Array[RacerData] = []
@@ -46,6 +48,11 @@ var bot_count: int:
 		_bot_count = clampi(value, MIN_BOTS, max_bots)
 
 var _bot_count: int = MAX_BOTS
+
+## Скільки кіл у гонці на обраній мапі.
+var laps: int:
+	get:
+		return selected_map.laps if selected_map else DEFAULT_LAPS
 
 
 func _init() -> void:

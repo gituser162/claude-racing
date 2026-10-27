@@ -129,8 +129,7 @@ func _track_distance(other: Car) -> float:
 		return 0.0
 	var mine := track.get_offset_of(car.body.global_position)
 	var theirs := track.get_offset_of(other.body.global_position)
-	var d := fposmod(theirs - mine, track.length)
-	return d if d <= track.length * 0.5 else d - track.length
+	return track.signed_gap(mine, theirs)
 
 
 func _nearest_along_track(max_distance: float, ahead: bool) -> Car:

@@ -50,7 +50,14 @@ var _model: Node3D
 ## Фон меню — траса обраної мапи (ставиться до входу сцени в дерево, як і в гонці).
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_SCENE_INSTANTIATED:
-		Game.swap_in_selected_map($TestTrack)
+		_place_showcase(Game.swap_in_selected_map($TestTrack))
+
+
+## Подіум з моделлю — у місці, яке задає траса (на «Спіралі» він на даху вежі).
+func _place_showcase(track: Node3D) -> void:
+	var track_script := track as Track
+	if track_script:
+		$Showcase.position = track_script.menu_showcase
 
 
 func _ready() -> void:
@@ -197,8 +204,9 @@ func _change_map(step: int) -> void:
 	_map_index = wrapi(_map_index + step, 0, Game.MAPS.size())
 	Game.selected_map = Game.MAPS[_map_index]
 	_show_map()
-	# Фон меню — теж обрана траса.
-	Game.swap_in_selected_map($TestTrack)
+	# Фон меню — теж обрана траса; подіум переїжджає туди, де йому місце на цій трасі.
+	_place_showcase(Game.swap_in_selected_map($TestTrack))
+	_show_racer()
 
 
 ## Більше / менше ботів у межах Game.MIN_BOTS..Game.max_bots (без переходу по колу).

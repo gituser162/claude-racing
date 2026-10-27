@@ -13,7 +13,7 @@ MAP=city_street $G --headless --fixed-fps 60 --path $P -s $P/tools/tests/race_te
 ```
 
 `--fixed-fps 60` — фізика крутиться на максимальній швидкості (повна гонка ~1–2 хв реального часу).
-Мапа — змінна `MAP` (`neon_overpass`, `city_street`), за замовчуванням перша зі списку.
+Мапа — змінна `MAP` (`neon_overpass`, `city_street`, `spiral`), за замовчуванням перша зі списку.
 Скріншоти потребують віртуального екрана: `OUT=<папка> xvfb-run -a -s "-screen 0 1280x720x24" $G --path $P --rendering-driver opengl3 --resolution 1280x720 -s …`.
 Повідомлення «resources still in use / ObjectDB leaked» при виході — норма для таких скриптів.
 
@@ -21,7 +21,7 @@ MAP=city_street $G --headless --fixed-fps 60 --path $P -s $P/tools/tests/race_te
 |---|---|---|
 | `parse_check.gd` | основні скрипти завантажуються | усі `ok=true` |
 | `spawn_test.gd` | кількість ботів 6 / 3 / 1 | 7 / 4 / 2 машини, без повторів |
-| `race_test.gd` | повна гонка, гравця веде автопілот | усі фінішують; на вулиці респаунів 0, тертя об стіни — секунди |
+| `race_test.gd` | повна гонка, гравця веде автопілот | усі фінішують; на вулиці респаунів 0, тертя об стіни — секунди; «Спіраль» — ~52–54 с, респаунів 0 |
 | `skills_test.gd` | кожен Q і E кожного гонщика (естакада) | усі `ok=true`, ефект на суперниках (SLOW/SPIN/PROT/GHOST) |
 | `dynamics_test.gd` | щільність зграї навколо гравця (`SKILL=0.85…1.0`) | кілька ботів у 35 м, багато змін місця |
 | `barrier_clip_test.gd` | кузов не заходить у бар'єр | `0 / 1000` |
@@ -30,6 +30,7 @@ MAP=city_street $G --headless --fixed-fps 60 --path $P -s $P/tools/tests/race_te
 | `shots_race.gd` | скріншоти меню й гонки | — |
 | `shots_menu.gd` | екран вибору (фокус на рядках) | — |
 | `shots_city_street.gd` | ключові місця «Міської вулиці» | — |
+| `shots_spiral.gd` | «Спіраль»: старт на даху, заїзд, витки, фініш, вежа згори | — |
 
 Тести бар'єрів і скілів прив'язані до естакади (шпилька ~680 м). Перевірка експортованої збірки:
 `$G --headless --main-pack <ClaudeRacing.exe> -s <абсолютний шлях до race_test.gd>` (запускати не з папки проєкту).

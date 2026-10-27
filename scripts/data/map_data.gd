@@ -10,6 +10,8 @@ extends Resource
 @export_multiline var description: String
 ## Сцена траси. Корінь сцени — вузол зі скриптом Track (scripts/race/track.gd).
 @export_file("*.tscn") var scene_path: String
+## Скільки кіл у гонці. 1 — для трас-«спринтів» від старту до фінішу (Track.closed = false).
+@export_range(1, 9) var laps: int = 3
 
 
 ## Завантажує сцену траси (лише коли вона справді потрібна).

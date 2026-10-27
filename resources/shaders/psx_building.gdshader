@@ -14,6 +14,8 @@ uniform vec4 pink : source_color = vec4(1.0, 0.35, 0.8, 1.0);
 uniform float texel_density = 4.0;
 // Застарілий параметр (тремтіння вершин) — більше не діє.
 uniform vec2 snap_grid = vec2(0.0);
+// Рівень землі: нижче ground_y + 1,5 м вікон немає (цоколь). Для міст нижче нуля (вежа «Спіраль») — висота їхньої землі.
+uniform float ground_y = 0.0;
 
 varying vec3 world_pos;
 varying vec3 world_normal;
@@ -38,7 +40,7 @@ void fragment() {
 	vec2 texel = floor(face * texel_density);
 	float noise = 0.82 + 0.3 * hash(texel + side) + 0.18 * (hash(floor(texel / 4.0) + 7.0) - 0.5);
 	vec3 wall = wall_color.rgb * noise;
-	if (n.y >= 0.5 || world_pos.y <= 1.5) {
+	if (n.y >= 0.5 || world_pos.y <= ground_y + 1.5) {
 		ALBEDO = wall;
 	} else {
 		vec2 p = vec2(along, world_pos.y) / window_cell;

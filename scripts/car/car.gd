@@ -633,9 +633,11 @@ func is_jumping() -> bool:
 func apply_slow(factor: float, duration: float) -> bool:
 	if is_protected():
 		return false
+	var fresh := _slow_left <= 0.0
 	_slow_factor = minf(factor, _slow_factor) if _slow_left > 0.0 else factor
 	_slow_left = maxf(_slow_left, duration)
-	if factor < 0.9:
+	# Звук і поштовх камери — лише на початку сповільнення, а не щокадру (трос трактора оновлює його постійно).
+	if factor < 0.9 and fresh:
 		Audio.play_at(&"slow", body.global_position, -4.0)
 		jolted.emit(0.3)
 	return true

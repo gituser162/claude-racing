@@ -96,10 +96,14 @@ func _ready() -> void:
 			car = _spawn_bot(bot_index)
 			bot_index += 1
 		car.teleport(_grid_transform(slot))
+		car.fall_limit_y = _track.fall_limit_y
 		_cars.append(car)
 		_states[car] = CarRaceState.new()
 		# Скіли заблоковані на час відліку і ще кілька секунд після старту.
 		car.skills.lock_for(COUNTDOWN_TIME + SKILL_START_LOCK)
+		# Гонка в одне коло (спринт) — це вже останнє коло: ультімейт доступний одразу.
+		if Game.laps == 1:
+			car.skills.unlock_ultimate()
 	for car: Car in _cars:
 		car.skills.set_race(_cars, _track)
 	for car: Car in _drivers:
@@ -208,7 +212,9 @@ func _bot_racer(index: int) -> RacerData:
 func _grid_transform(slot: int) -> Transform3D:
 	var back := GRID_FIRST_ROW + (slot / 2) * GRID_ROW_STEP
 	var lateral := -GRID_LATERAL if slot % 2 == 0 else GRID_LATERAL
-	return _track.get_transform_at(_track.length - back, lateral)
+	# Сітка стоїть позаду лінії старту: на колі — у кінці кривої, на спринті — перед start_offset.
+	var line := _track.length if _track.closed else _track.start_offset
+	return _track.get_transform_at(line - back, lateral)
 
 
 func _physics_process(delta: float) -> void:
@@ -217,6 +223,7 @@ func _physics_process(delta: float) -> void:
 		return
 	_race_time += delta
 	_check_wrong_way(delta)
+	_check_off_road()
 	_dynamics.update(delta, _cars, _car, _progress, _is_finished)
 
 
@@ -249,6 +256,16 @@ func _update_see_through(delta: float) -> void:
 func _is_finished(car: Car) -> bool:
 	var state: CarRaceState = _states[car]
 	return state.finished
+
+
+## Машина вилетіла за відбійник у прірву (траси з respawn_off_road) — одразу на останній чекпоінт,
+## не чекаючи, поки вона впаде до fall_limit_y.
+func _check_off_road() -> void:
+	if not _track.respawn_off_road:
+		return
+	for car: Car in _cars:
+		if not _states[car].finished and _track.is_off_road(car.ball.global_position):
+			car.respawn()
 
 
 ## «Не той бік»: гравець їде проти напрямку траси.
@@ -292,7 +309,7 @@ func _on_checkpoint_passed(car: Car, index: int) -> void:
 	state.next_checkpoint = (index + 1) % _track.checkpoint_count
 	state.checkpoints_this_lap += 1
 	car.set_respawn_point(_track.get_checkpoint_transform(index))
-	if index == 0:
+	if index == _track.finish_checkpoint:
 		_complete_lap(car, state)
 
 
@@ -301,17 +318,17 @@ func _complete_lap(car: Car, state: CarRaceState) -> void:
 	state.last_lap = lap_time
 	if state.best_lap < 0.0 or lap_time < state.best_lap:
 		state.best_lap = lap_time
-	if state.lap >= Game.LAPS:
+	if state.lap >= Game.laps:
 		_finish(car, state)
 		return
 	state.lap += 1
 	state.checkpoints_this_lap = 0
 	state.lap_start_time = _race_time
-	if state.lap == Game.LAPS:
+	if state.lap == Game.laps:
 		car.skills.unlock_ultimate()
 	if car == _car:
-		Audio.play(&"final_lap" if state.lap == Game.LAPS else &"lap")
-		var text := "ОСТАННЄ КОЛО!\nУльтімейт [E] готовий" if state.lap == Game.LAPS else "Коло %d" % state.lap
+		Audio.play(&"final_lap" if state.lap == Game.laps else &"lap")
+		var text := "ОСТАННЄ КОЛО!\nУльтімейт [E] готовий" if state.lap == Game.laps else "Коло %d" % state.lap
 		_show_message("%s\n%s" % [text, _format_time(lap_time)], 2.5)
 
 
@@ -320,7 +337,11 @@ func _finish(car: Car, state: CarRaceState) -> void:
 	state.finish_time = _race_time
 	_finish_order.append(car)
 	if _drivers.has(car):
-		_drivers[car].active = false
+		if _track.closed:
+			_drivers[car].active = false
+		else:
+			# Спринт: за фінішем траса закінчується — бот гальмує в зоні за фінішем.
+			_drivers[car].brake_to_stop = true
 	else:
 		# Гравець фінішував: машину далі веде автопілот, показуємо результати.
 		car.controlled_by_player = false
@@ -329,6 +350,7 @@ func _finish(car: Car, state: CarRaceState) -> void:
 		car.add_child(autopilot)
 		autopilot.setup(car, _track, _cars, RandomNumberGenerator.new())
 		autopilot.skill = 0.8
+		autopilot.brake_to_stop = not _track.closed
 		_show_message("ФІНІШ!  %d місце" % _finish_order.size(), 2.5)
 		Audio.play(&"finish")
 		get_tree().create_timer(2.5).timeout.connect(_show_results)
@@ -338,6 +360,8 @@ func _finish(car: Car, state: CarRaceState) -> void:
 func _progress(car: Car) -> float:
 	var state: CarRaceState = _states[car]
 	var offset := _track.get_offset_of(car.body.global_position)
+	if not _track.closed:
+		return offset - _track.start_offset
 	# На старті машина стоїть за лінією, тобто «в кінці» кривої — це ще до старту.
 	if state.checkpoints_this_lap == 0 and offset > _track.length * 0.5:
 		offset -= _track.length
@@ -371,10 +395,19 @@ func _update_hud() -> void:
 	var lap_time := 0.0 if state.finished or _phase == Phase.COUNTDOWN else _race_time - state.lap_start_time
 	_place_num.text = str(order.find(_car) + 1)
 	_place_total.text = "/%d" % _cars.size()
-	_lap_label.text = "КОЛО %d/%d" % [mini(state.lap, Game.LAPS), Game.LAPS]
-	_times_label.text = "ЧАС  %s\nКОЛО  %s\nКРАЩЕ  %s" % [
-		_format_time(time), _format_time(lap_time),
-		_format_time(state.best_lap) if state.best_lap >= 0.0 else "—"]
+	if _track.floor_height > 0.0:
+		# Вежа: замість кола — поверх, на якому зараз гравець.
+		var floor_number := _track.get_floor(_car.body.global_position)
+		var top := _track.get_floor(_track.get_transform_at(0.0).origin)
+		_lap_label.text = "ДАХ" if floor_number >= top else "ПОВЕРХ %d" % floor_number
+	else:
+		_lap_label.text = "КОЛО %d/%d" % [mini(state.lap, Game.laps), Game.laps]
+	if Game.laps == 1:
+		_times_label.text = "ЧАС  %s" % _format_time(time)
+	else:
+		_times_label.text = "ЧАС  %s\nКОЛО  %s\nКРАЩЕ  %s" % [
+			_format_time(time), _format_time(lap_time),
+			_format_time(state.best_lap) if state.best_lap >= 0.0 else "—"]
 	var kmh := absf(_car.get_speed()) * 3.6
 	_speed_num.text = str(roundi(kmh))
 	_speed_bar.value = clampf(kmh / 180.0, 0.0, 1.0)
@@ -419,8 +452,11 @@ func _show_results() -> void:
 
 
 func _update_results(order: Array[Car]) -> void:
-	var rows: PackedStringArray = ["[font_size=20][color=#ff4dd2]РЕЗУЛЬТАТИ[/color][/font_size]\n", "[table=4]"]
-	for header: String in ["#", "ГОНЩИК", "ЧАС", "КРАЩЕ КОЛО"]:
+	# В гонці на одне коло «краще коло» = загальний час — цю колонку не показуємо.
+	var one_lap := Game.laps == 1
+	var headers: Array[String] = ["#", "ГОНЩИК", "ЧАС"] if one_lap else ["#", "ГОНЩИК", "ЧАС", "КРАЩЕ КОЛО"]
+	var rows: PackedStringArray = ["[font_size=20][color=#ff4dd2]РЕЗУЛЬТАТИ[/color][/font_size]\n", "[table=%d]" % headers.size()]
+	for header: String in headers:
 		rows.append("[cell][color=#5ff2ff]%s[/color]  [/cell]" % header)
 	for i: int in order.size():
 		var car := order[i]
@@ -428,7 +464,8 @@ func _update_results(order: Array[Car]) -> void:
 		var time := _format_time(state.finish_time) if state.finished else "у гонці"
 		var best := _format_time(state.best_lap) if state.best_lap >= 0.0 else "—"
 		var color := "#ff4dd2" if car == _car else "#e0dcf2"
-		for cell: String in [str(i + 1), _display_name(car), time, best]:
+		var cells: Array[String] = [str(i + 1), _display_name(car), time] if one_lap else [str(i + 1), _display_name(car), time, best]
+		for cell: String in cells:
 			rows.append("[cell][color=%s]%s[/color]  [/cell]" % [color, cell])
 	rows.append("[/table]")
 	rows.append("\n[color=#5ff2ff]R[/color] — ще раз        [color=#5ff2ff]ENTER[/color] — меню")
