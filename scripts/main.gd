@@ -20,14 +20,6 @@ const COUNTDOWN_TIME: float = 3.0
 const WRONG_WAY_DELAY: float = 0.8
 ## Скільки секунд після старту скіли заблоковані.
 const SKILL_START_LOCK: float = 3.0
-## Прихований баф наздоганяння: з якого місця діє, множник макс. швидкості, як часто перераховувати.
-const CATCHUP_FROM_PLACE: int = 4
-const CATCHUP_SPEED: float = 1.15
-const CATCHUP_INTERVAL: float = 0.25
-## Прихований баф ботам: +10% макс. швидкості, поки гравець на 1-му місці.
-const BOT_SPEED_WHEN_PLAYER_LEADS: float = 1.10
-## Прихований дебаф ботам: −20% макс. швидкості, поки гравець на останньому місці.
-const BOT_SPEED_WHEN_PLAYER_LAST: float = 0.8
 ## Тимчасово, поки гонщик один: боти різної ваги, щоб відчути зіткнення.
 ## Порядок як у BOT_COLORS: бірюзовий, жовтий, фіолетовий, білий, зелений, помаранчевий, рожевий.
 const BOT_WEIGHTS: Array[int] = [3, 1, 2, 3, 1, 2, 3]
@@ -65,7 +57,9 @@ var _phase: Phase = Phase.COUNTDOWN
 var _countdown_left: float = COUNTDOWN_TIME
 var _last_countdown_number: int = 0
 var _wrong_way_time: float = 0.0
-var _catchup_timer: float = 0.0
+## Прихована динаміка гонки навколо гравця (див. scripts/race/race_dynamics.gd).
+var _dynamics := RaceDynamics.new()
+var _bot_racers: Array[RacerData] = []
 
 
 class CarRaceState:
@@ -79,12 +73,20 @@ class CarRaceState:
 	var finish_time: float = 0.0
 
 
+## Траса обраної мапи стає на місце $TestTrack одразу після створення сцени —
+## ще до входу в дерево й до @onready, тож усе далі працює з потрібною трасою.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_SCENE_INSTANTIATED:
+		Game.swap_in_selected_map($TestTrack)
+
+
 func _ready() -> void:
 	_track.checkpoint_passed.connect(_on_checkpoint_passed)
 	_car.enable_headlight_light()
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	var slots := Game.bot_count + 1
+	_bot_racers = _pick_bot_racers(Game.bot_count, rng)
 	var bot_index := 0
 	for slot: int in slots:
 		var car: Car
@@ -166,15 +168,36 @@ func _spawn_bot(index: int) -> Car:
 	return car
 
 
-## Гонщик для бота: по черзі всі гонщики з Game.RACERS, крім обраного гравцем.
-## Поки гонщик лише один — копія гравцевого іншого кольору й ваги.
-func _bot_racer(index: int) -> RacerData:
+## Які гонщики стануть ботами: усі з Game.RACERS, крім обраного гравцем, без повторів.
+## Якщо ботів менше, ніж гонщиків, — випадкові з них (у порядку Game.RACERS).
+func _pick_bot_racers(count: int, rng: RandomNumberGenerator) -> Array[RacerData]:
 	var pool: Array[RacerData] = []
 	for racer: RacerData in Game.RACERS:
 		if racer != Game.selected_racer:
 			pool.append(racer)
-	if not pool.is_empty():
-		return pool[index % pool.size()]
+	if count >= pool.size():
+		return pool
+	var indices: Array[int] = []
+	indices.assign(range(pool.size()))
+	# Тасування Фішера — Єйтса тим самим rng, що й у ботів.
+	for i: int in range(indices.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var tmp := indices[i]
+		indices[i] = indices[j]
+		indices[j] = tmp
+	var chosen := indices.slice(0, count)
+	chosen.sort()
+	var result: Array[RacerData] = []
+	for i: int in chosen:
+		result.append(pool[i])
+	return result
+
+
+## Гонщик для бота: з відібраних _pick_bot_racers.
+## Поки гонщик лише один — копія гравцевого іншого кольору й ваги.
+func _bot_racer(index: int) -> RacerData:
+	if not _bot_racers.is_empty():
+		return _bot_racers[index % _bot_racers.size()]
 	var data: RacerData = Game.selected_racer.duplicate()
 	data.car_color = BOT_COLORS[index % BOT_COLORS.size()]
 	data.weight = BOT_WEIGHTS[index % BOT_WEIGHTS.size()]
@@ -194,34 +217,12 @@ func _physics_process(delta: float) -> void:
 		return
 	_race_time += delta
 	_check_wrong_way(delta)
-	_update_catchup(delta)
+	_dynamics.update(delta, _cars, _car, _progress, _is_finished)
 
 
-## Прихований баф для тих, хто відстає (див. константи CATCHUP_* угорі),
-## баф ботам, поки гравець лідирує, і дебаф ботам, поки гравець останній.
-## Множники перемножуються (бот на 4-му+ місці, коли гравець останній: 1.15 × 0.8).
-func _update_catchup(delta: float) -> void:
-	_catchup_timer -= delta
-	if _catchup_timer > 0.0:
-		return
-	_catchup_timer = CATCHUP_INTERVAL
-	var order := _current_order()
-	var player_state: CarRaceState = _states[_car]
-	var player_leads: bool = order[0] == _car and not player_state.finished
-	# Лише коли машин більше однієї — інакше гравець водночас і перший, і останній.
-	var player_last: bool = order.size() > 1 and order[order.size() - 1] == _car \
-			and not player_state.finished
-	for i: int in order.size():
-		var car := order[i]
-		var state: CarRaceState = _states[car]
-		var behind: bool = i + 1 >= CATCHUP_FROM_PLACE and not state.finished
-		var is_active_bot: bool = car != _car and not state.finished
-		var multiplier := CATCHUP_SPEED if behind else 1.0
-		if is_active_bot and player_leads:
-			multiplier *= BOT_SPEED_WHEN_PLAYER_LEADS
-		if is_active_bot and player_last:
-			multiplier *= BOT_SPEED_WHEN_PLAYER_LAST
-		car.catchup_multiplier = multiplier
+func _is_finished(car: Car) -> bool:
+	var state: CarRaceState = _states[car]
+	return state.finished
 
 
 ## «Не той бік»: гравець їде проти напрямку траси.

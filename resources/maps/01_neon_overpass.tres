@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="MapData" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/map_data.gd" id="1_map"]
+
+[resource]
+script = ExtResource("1_map")
+id = &"neon_overpass"
+display_name = "Неонова естакада"
+description = "Нічна естакада над містом: шпилька, трамплін і міст."
+scene_path = "res://scenes/track/test_track.tscn"
