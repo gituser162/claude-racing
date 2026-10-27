@@ -644,8 +644,13 @@ func _add_mesh(parent: Node3D, mesh: Mesh, mat: Material, pos: Vector3) -> MeshI
 	return node
 
 
+## Відстань по горизонталі від точки до найближчої ділянки дороги.
+## Для трас на землі шукаємо з висоти землі міста: тоді найближча точка кривої в 3D — та, що найближча
+## й по горизонталі (на «Спіралі» з висоти 0 найближчим виявлявся дах, і будинки ставали на пряму виходу внизу).
+## На естакаді — як і раніше (дорога там майже на одній висоті).
 func _distance_to_road(pos: Vector3) -> float:
-	var nearest := path.to_global(curve.get_closest_point(path.to_local(pos)))
+	var query := pos if elevated else Vector3(pos.x, city_floor_y, pos.z)
+	var nearest := path.to_global(curve.get_closest_point(path.to_local(query)))
 	return Vector2(pos.x - nearest.x, pos.z - nearest.z).length()
 
 

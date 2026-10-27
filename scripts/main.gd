@@ -454,7 +454,10 @@ func _show_results() -> void:
 func _update_results(order: Array[Car]) -> void:
 	# В гонці на одне коло «краще коло» = загальний час — цю колонку не показуємо.
 	var one_lap := Game.laps == 1
-	var headers: Array[String] = ["#", "ГОНЩИК", "ЧАС"] if one_lap else ["#", "ГОНЩИК", "ЧАС", "КРАЩЕ КОЛО"]
+	# Типізований масив не можна присвоїти з тернарного виразу (там звичайний Array) — будуємо додаванням.
+	var headers: Array[String] = ["#", "ГОНЩИК", "ЧАС"]
+	if not one_lap:
+		headers.append("КРАЩЕ КОЛО")
 	var rows: PackedStringArray = ["[font_size=20][color=#ff4dd2]РЕЗУЛЬТАТИ[/color][/font_size]\n", "[table=%d]" % headers.size()]
 	for header: String in headers:
 		rows.append("[cell][color=#5ff2ff]%s[/color]  [/cell]" % header)
@@ -464,7 +467,9 @@ func _update_results(order: Array[Car]) -> void:
 		var time := _format_time(state.finish_time) if state.finished else "у гонці"
 		var best := _format_time(state.best_lap) if state.best_lap >= 0.0 else "—"
 		var color := "#ff4dd2" if car == _car else "#e0dcf2"
-		var cells: Array[String] = [str(i + 1), _display_name(car), time] if one_lap else [str(i + 1), _display_name(car), time, best]
+		var cells: Array[String] = [str(i + 1), _display_name(car), time]
+		if not one_lap:
+			cells.append(best)
 		for cell: String in cells:
 			rows.append("[cell][color=%s]%s[/color]  [/cell]" % [color, cell])
 	rows.append("[/table]")
