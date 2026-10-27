@@ -34,6 +34,7 @@ const SFX: Dictionary = {
 	&"tractor": preload("res://assets/audio/sfx/tractor.wav"),
 	&"ui_move": preload("res://assets/audio/sfx/ui_move.wav"),
 	&"ui_select": preload("res://assets/audio/sfx/ui_select.wav"),
+	&"wind_loop": preload("res://assets/audio/sfx/wind_loop.wav"),
 }
 
 @export var music_volume_db: float = -9.0

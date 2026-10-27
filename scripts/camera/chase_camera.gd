@@ -27,6 +27,10 @@ func _ready() -> void:
 		target.respawned.connect(snap)
 		target.jolted.connect(add_shake)
 		snap()
+		var wind := WindEffect.new()
+		wind.name = "Wind"
+		wind.car = target
+		add_child(wind)
 
 
 ## Додає «струс» камери (0..1). Сила росте квадратично, тож дрібні удари ледь помітні.

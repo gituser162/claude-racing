@@ -17,6 +17,8 @@ signal jolted(strength: float)
 
 ## Значення характеристик за зірками 1..3 (індекс 0 не використовується).
 const STAT_MAX_SPEED: Array[float] = [0.0, 29.0, 30.5, 32.0]   # м/с (≈ 104 / 110 / 115 км/год)
+## Загальна надбавка до макс. швидкості всім гонщикам: +30 км/год (≈ 134 / 140 / 145 км/год).
+const SPEED_BONUS: float = 30.0 / 3.6
 const STAT_ACCEL: Array[float] = [0.0, 12.0, 14.5, 17.0]       # м/с²
 const STAT_TURN: Array[float] = [0.0, 1.9, 2.3, 2.7]           # рад/с
 const STAT_MASS: Array[float] = [0.0, 100.0, 140.0, 180.0]     # кг (впливає на зіткнення)
@@ -167,7 +169,7 @@ func _ready() -> void:
 ## Застосовує характеристики, модель, колір і скіли гонщика.
 func apply_racer(data: RacerData) -> void:
 	racer = data
-	max_speed = STAT_MAX_SPEED[data.speed] * data.top_speed_multiplier
+	max_speed = (STAT_MAX_SPEED[data.speed] + SPEED_BONUS) * data.top_speed_multiplier
 	acceleration = STAT_ACCEL[data.acceleration]
 	turn_speed = STAT_TURN[data.handling]
 	_base_mass = STAT_MASS[data.weight]
