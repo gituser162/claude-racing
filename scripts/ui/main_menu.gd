@@ -363,9 +363,10 @@ func _map_summary(map: MapData) -> String:
 	var distance := length if closed else length - track.start_offset - track.finish_runout
 	track.free()
 	var km := ("%.1f км" % (distance / 1000.0)).replace(".", ",")
+	var no_skills := "" if map.skills_enabled else " · без умінь"
 	if closed:
-		return "Коло · %d %s · %s" % [map.laps, _laps_word(map.laps), km]
-	return "Спринт · один заїзд · %s" % km
+		return "Коло · %d %s · %s%s" % [map.laps, _laps_word(map.laps), km, no_skills]
+	return "Спринт · один заїзд · %s%s" % [km, no_skills]
 
 
 ## Підсвітка: обрана траса — неонова рамка (яскравіша, коли рядок у фокусі), інші — притушені.

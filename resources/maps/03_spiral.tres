@@ -9,3 +9,4 @@ display_name = "Спіраль"
 description = "Good Luck"
 scene_path = "res://scenes/track/spiral_tower.tscn"
 laps = 1
+skills_enabled = false

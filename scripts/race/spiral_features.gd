@@ -8,7 +8,7 @@ extends Node3D
 ## Числа вежі мають збігатися з tools/spiral_layout.py (центр, радіуси, висота).
 
 @export var tower_center: Vector2 = Vector2(-6.0, 0.0)
-@export var tower_radius: float = 32.0
+@export var tower_radius: float = 21.0
 ## Точка, де заїзд з даху переходить у спіраль (x, z) — від неї рахується спуск.
 @export var spiral_start: Vector2 = Vector2(-33.33, -30.56)
 @export var ring_radius: float = 41.0
@@ -103,7 +103,8 @@ func _build_ramp(start: float, end: float) -> void:
 	var column := BoxMesh.new()
 	column.size = Vector3(0.9, 1.0, 0.9)
 	var concrete := _track._psx_material(Color(0.2, 0.19, 0.23))
-	var lateral := 8.1
+	# Колони — за зовнішнім відбійником, на краю плити.
+	var lateral := _track.road_width * 0.5 + 1.1
 	var offset := start + column_spacing * 0.5
 	while offset < end:
 		var t := _track.get_transform_at(offset, lateral)
@@ -121,7 +122,8 @@ func _build_ramp(start: float, end: float) -> void:
 	pink.set_shader_parameter(&"detail_strength", 0.0)
 	_track._add_path_strip(holder, PackedVector2Array([Vector2(-4.2, -1.0), Vector2(-3.9, -1.0), Vector2(-3.9, -1.08), Vector2(-4.2, -1.08)]), cyan)
 	_track._add_path_strip(holder, PackedVector2Array([Vector2(3.9, -1.0), Vector2(4.2, -1.0), Vector2(4.2, -1.08), Vector2(3.9, -1.08)]), pink)
-	_track._add_path_strip(holder, PackedVector2Array([Vector2(8.6, -0.25), Vector2(8.68, -0.25), Vector2(8.68, -0.6), Vector2(8.6, -0.6)]), pink)
+	var edge := _track.road_width * 0.5 + 1.6   # зовнішній торець плити
+	_track._add_path_strip(holder, PackedVector2Array([Vector2(edge, -0.25), Vector2(edge + 0.08, -0.25), Vector2(edge + 0.08, -0.6), Vector2(edge, -0.6)]), pink)
 
 
 func _add_column(holder: Node3D, mesh: Mesh, mat: Material, at: Vector3, from_y: float, to_y: float) -> void:
@@ -233,9 +235,9 @@ func _build_finish() -> void:
 	post.size = Vector3(0.8, 7.0, 0.8)
 	var metal := _track._psx_material(Color(0.12, 0.12, 0.14))
 	for side: float in [-1.0, 1.0]:
-		_track._add_mesh(holder, post, metal, Vector3(side * 9.5, 3.5, 0.0))
+		_track._add_mesh(holder, post, metal, Vector3(side * (_track.road_width * 0.5 + 2.5), 3.5, 0.0))
 	var banner := BoxMesh.new()
-	banner.size = Vector3(20.0, 1.6, 0.6)
+	banner.size = Vector3(_track.road_width + 6.0, 1.6, 0.6)
 	_track._add_mesh(holder, banner, _track._psx_material(Color(0.05, 0.3, 0.35), Color(0.15, 0.9, 1.0), 1.5), Vector3(0.0, 7.2, 0.0))
 	var label := _label("ФІНІШ", 110, Color(1.0, 1.0, 1.0))
 	label.position = Vector3(0.0, 7.2, 0.5)

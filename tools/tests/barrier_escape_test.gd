@@ -22,7 +22,7 @@ func _initialize() -> void:
 		for steer in [1.0, 0.7]:
 			var t: Transform3D = track.get_transform_at(400.0)
 			var face: Vector3 = (-t.basis.z).rotated(Vector3.UP, deg_to_rad(yaw))
-			car.teleport(Transform3D(Basis.looking_at(face, Vector3.UP), t.origin + t.basis.x * 5.6))
+			car.teleport(Transform3D(Basis.looking_at(face, Vector3.UP), t.origin + t.basis.x * (track.road_width * 0.5 - 1.4)))
 			for i in 2: await physics_frame
 			car.ball.linear_velocity = -t.basis.z * 36.0 + t.basis.x * 2.0
 			car._drift = 1.0 if yaw > 0.0 else 0.0
@@ -39,7 +39,7 @@ func _initialize() -> void:
 				lateral = (car.body.global_position - tt.origin).dot(tt.basis.x)
 				if car._scraping: scrape += 1
 				if i < 90: min_lateral = minf(min_lateral, lateral)
-				if away_time < 0.0 and lateral < 7.0 - car.footprint.x * 0.5 - 1.0:
+				if away_time < 0.0 and lateral < track.road_width * 0.5 - car.footprint.x * 0.5 - 1.0:
 					away_time = i / 60.0
-			print("yaw %+3d° steer %.1f: від стіни на 1 м за %s, за 1,5 с відійшов до lateral %.1f м (стіна 7), %d км/год" % [yaw, steer, ("%.2f с" % away_time) if away_time >= 0.0 else "НІКОЛИ", min_lateral, car.ball.linear_velocity.length() * 3.6])
+			print("yaw %+3d° steer %.1f: від стіни на 1 м за %s, за 1,5 с відійшов до lateral %.1f м (стіна %.0f), %d км/год" % [yaw, steer, ("%.2f с" % away_time) if away_time >= 0.0 else "НІКОЛИ", min_lateral, track.road_width * 0.5, car.ball.linear_velocity.length() * 3.6])
 	quit()

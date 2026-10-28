@@ -35,7 +35,7 @@
 | Що | Шлях | Примітка |
 |---|---|---|
 | Сцена траси | `scenes/track/<id>.tscn` | Корінь — `Node3D` зі скриптом `scripts/race/track.gd` (клас `Track`), дочірній `Path3D` з іменем `TrackPath` (крива по центру дороги) і дорога (`CSGPolygon3D` по цій кривій). Найпростіше — скопіювати `test_track.tscn` і змінити криву. |
-| Дані мапи | `resources/maps/<NN>_<id>.tres` | Ресурс `MapData` (`scripts/data/map_data.gd`): `id`, `display_name`, `description` (один рядок), `scene_path`, `laps` (3; для спринту — 1). |
+| Дані мапи | `resources/maps/<NN>_<id>.tres` | Ресурс `MapData` (`scripts/data/map_data.gd`): `id`, `display_name`, `description` (один рядок), `scene_path`, `laps` (3; для спринту — 1), `skills_enabled` (false — уміння Q/E вимкнені на цій мапі). |
 | Реєстрація | `scripts/autoload/game.gd` → `MAP_PATHS` | Додати рядок зі шляхом до `.tres`. **Саме шлях, не `preload`** — інакше цикл залежностей і експортована гра не запускається (як і з гонщиками). |
 
 ### Як це працює

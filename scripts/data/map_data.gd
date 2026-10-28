@@ -12,6 +12,8 @@ extends Resource
 @export_file("*.tscn") var scene_path: String
 ## Скільки кіл у гонці. 1 — для трас-«спринтів» від старту до фінішу (Track.closed = false).
 @export_range(1, 9) var laps: int = 3
+## false — на цій мапі вміння (Q і E) вимкнені для всіх гонщиків, панель скілів на HUD прихована.
+@export var skills_enabled: bool = true
 
 
 ## Завантажує сцену траси (лише коли вона справді потрібна).

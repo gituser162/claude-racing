@@ -104,6 +104,8 @@ func _ready() -> void:
 		# Гонка в одне коло (спринт) — це вже останнє коло: ультімейт доступний одразу.
 		if Game.laps == 1:
 			car.skills.unlock_ultimate()
+		# Мапа без умінь — Q і E не працюють ні в кого (і в ботів теж).
+		car.skills.disabled = not Game.selected_map.skills_enabled
 	for car: Car in _cars:
 		car.skills.set_race(_cars, _track)
 	for car: Car in _drivers:
@@ -120,6 +122,7 @@ func _ready() -> void:
 	_set_cars_enabled(false)
 	_results_panel.visible = false
 	_wrong_way_label.visible = false
+	_skills_box.visible = Game.selected_map.skills_enabled
 
 
 func _on_bumped(a: Car, b: Car, strength: float) -> void:

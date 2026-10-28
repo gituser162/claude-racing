@@ -16,6 +16,8 @@ var cars: Array[Car] = []
 var track: Track
 
 var _lock_left: float = 0.0
+## Вміння вимкнені на всю гонку (мапа без умінь, MapData.skills_enabled = false).
+var disabled: bool = false
 var _ultimate_unlocked: bool = false
 
 
@@ -43,7 +45,7 @@ func unlock_ultimate() -> void:
 
 
 func is_locked() -> bool:
-	return _lock_left > 0.0
+	return disabled or _lock_left > 0.0
 
 
 func lock_left() -> float:
