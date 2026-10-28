@@ -10,7 +10,7 @@ func _initialize() -> void:
 	var menu: Node = load("res://scenes/menu/main_menu.tscn").instantiate()
 	root.add_child(menu)
 	for i in 150: await process_frame
-	menu.call("_show_select")
+	menu.call("_show_racer_screen")
 	for i in 60: await process_frame
 	await _snap("menu")
 	menu.queue_free()

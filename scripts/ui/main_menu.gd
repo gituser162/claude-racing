@@ -1,25 +1,24 @@
 extends Node3D
-## Головне меню і вибір гонщика та налаштувань гонки (траса, кількість ботів).
-## На фоні — траса з нічним містом: у головному меню камера повільно облітає старт,
-## на екрані вибору — модель гонщика обертається на подіумі.
+## Головне меню → вибір гонщика → вибір траси й кількості ботів → гонка.
+## На фоні — траса обраної мапи з нічним містом: у головному меню камера повільно облітає старт,
+## на екрані гонщика модель обертається на подіумі, на екрані траси камера облітає обрану трасу.
 
 const RACE_SCENE: String = "res://scenes/main.tscn"
 const PSX_SHADER: Shader = preload("res://resources/shaders/psx.gdshader")
 const STAT_NAMES: Array[String] = ["Швидкість", "Розгін", "Керування", "Вага"]
 
-enum Screen { MAIN, SELECT }
-## Рядки екрана вибору, між якими ходить фокус (↑/↓). Порядок — зверху вниз на екрані.
-enum Row { RACER, MAP, BOTS, BUTTONS }
+enum Screen { MAIN, RACER, MAP }
 
 @onready var _camera: Camera3D = $Camera3D
 @onready var _turntable: Node3D = $Showcase/Turntable
 @onready var _showcase: Node3D = $Showcase
 @onready var _main_panel: Control = $UI/MainPanel
-@onready var _select_panel: Control = $UI/SelectPanel
 @onready var _race_button: Button = $UI/MainPanel/Buttons/RaceButton
 @onready var _quit_button: Button = $UI/MainPanel/Buttons/QuitButton
-@onready var _start_button: Button = $UI/SelectPanel/Bottom/StartButton
-@onready var _back_button: Button = $UI/SelectPanel/Bottom/BackButton
+# Екран гонщика.
+@onready var _select_panel: Control = $UI/SelectPanel
+@onready var _continue_button: Button = $UI/SelectPanel/Bottom/ContinueButton
+@onready var _racer_back_button: Button = $UI/SelectPanel/Bottom/BackButton
 @onready var _prev_button: Button = $UI/SelectPanel/Prev
 @onready var _next_button: Button = $UI/SelectPanel/Next
 @onready var _name_label: Label = $UI/SelectPanel/Info/VBox/Name
@@ -28,23 +27,29 @@ enum Row { RACER, MAP, BOTS, BUTTONS }
 @onready var _stats_label: Label = $UI/SelectPanel/Info/VBox/StatsRow/Stats
 @onready var _skills_label: Label = $UI/SelectPanel/Info/VBox/Skills
 @onready var _counter_label: Label = $UI/SelectPanel/Counter
-@onready var _map_row: PanelContainer = $UI/SelectPanel/Settings/MapRow
-@onready var _map_prev: Button = $UI/SelectPanel/Settings/MapRow/HBox/Prev
-@onready var _map_next: Button = $UI/SelectPanel/Settings/MapRow/HBox/Next
-@onready var _map_name: Label = $UI/SelectPanel/Settings/MapRow/HBox/Value/Name
-@onready var _map_desc: Label = $UI/SelectPanel/Settings/MapRow/HBox/Value/Sub
-@onready var _bots_row: PanelContainer = $UI/SelectPanel/Settings/BotsRow
-@onready var _bots_prev: Button = $UI/SelectPanel/Settings/BotsRow/HBox/Prev
-@onready var _bots_next: Button = $UI/SelectPanel/Settings/BotsRow/HBox/Next
-@onready var _bots_value: Label = $UI/SelectPanel/Settings/BotsRow/HBox/Value/Name
-@onready var _bots_desc: Label = $UI/SelectPanel/Settings/BotsRow/HBox/Value/Sub
+# Екран траси.
+@onready var _map_panel: Control = $UI/MapPanel
+@onready var _map_counter: Label = $UI/MapPanel/Counter
+@onready var _map_racer_name: Label = $UI/MapPanel/Racer/VBox/Name
+@onready var _map_list: VBoxContainer = $UI/MapPanel/Column/Maps
+@onready var _start_button: Button = $UI/MapPanel/Bottom/StartButton
+@onready var _map_back_button: Button = $UI/MapPanel/Bottom/BackButton
+@onready var _bots_row: PanelContainer = $UI/MapPanel/Column/BotsRow
+@onready var _bots_prev: Button = $UI/MapPanel/Column/BotsRow/HBox/Prev
+@onready var _bots_next: Button = $UI/MapPanel/Column/BotsRow/HBox/Next
+@onready var _bots_value: Label = $UI/MapPanel/Column/BotsRow/HBox/Value/Name
+@onready var _bots_desc: Label = $UI/MapPanel/Column/BotsRow/HBox/Value/Sub
 
 var _screen: Screen = Screen.MAIN
 var _index: int = 0
 var _map_index: int = 0
-var _row: Row = Row.RACER
+## Рядок у фокусі на екрані траси: 0..мап-1 — картки трас, далі — «БОТИ», далі — кнопки.
+var _map_row: int = 0
+## На екрані гонщика: true — фокус на кнопках (НАЗАД / ДАЛІ), false — на виборі гонщика.
+var _racer_buttons_focused: bool = false
 var _time: float = 0.0
 var _model: Node3D
+var _map_cards: Array[PanelContainer] = []
 
 
 ## Фон меню — траса обраної мапи (ставиться до входу сцени в дерево, як і в гонці).
@@ -63,62 +68,106 @@ func _place_showcase(track: Node3D) -> void:
 func _ready() -> void:
 	get_tree().paused = false
 	_index = maxi(Game.RACERS.find(Game.selected_racer), 0)
-	_race_button.pressed.connect(_show_select)
+	_map_index = maxi(Game.MAPS.find(Game.selected_map), 0)
+	_race_button.pressed.connect(_show_racer_screen)
 	_quit_button.pressed.connect(func() -> void: get_tree().quit())
 	# У браузері «Вихід» не має сенсу.
 	_quit_button.visible = not OS.has_feature("web")
+	_continue_button.pressed.connect(_show_map_screen)
+	_racer_back_button.pressed.connect(_show_main)
 	_start_button.pressed.connect(_start_race)
-	_back_button.pressed.connect(_show_main)
-	_map_index = maxi(Game.MAPS.find(Game.selected_map), 0)
-	_prev_button.pressed.connect(_on_arrow.bind(Row.RACER, -1))
-	_next_button.pressed.connect(_on_arrow.bind(Row.RACER, 1))
-	_map_prev.pressed.connect(_on_arrow.bind(Row.MAP, -1))
-	_map_next.pressed.connect(_on_arrow.bind(Row.MAP, 1))
-	_bots_prev.pressed.connect(_on_arrow.bind(Row.BOTS, -1))
-	_bots_next.pressed.connect(_on_arrow.bind(Row.BOTS, 1))
-	# Клік по самому рядку теж переводить на нього фокус.
-	_map_row.gui_input.connect(_on_row_gui_input.bind(Row.MAP))
-	_bots_row.gui_input.connect(_on_row_gui_input.bind(Row.BOTS))
-	for button: Button in [_race_button, _quit_button, _start_button, _back_button]:
+	_map_back_button.pressed.connect(_show_racer_screen)
+	_prev_button.pressed.connect(_change_racer.bind(-1))
+	_next_button.pressed.connect(_change_racer.bind(1))
+	_bots_prev.pressed.connect(_on_bots_arrow.bind(-1))
+	_bots_next.pressed.connect(_on_bots_arrow.bind(1))
+	_bots_row.gui_input.connect(_on_row_click.bind(_bots_row_index))
+	for button: Button in [_race_button, _quit_button, _continue_button, _racer_back_button, _start_button, _map_back_button]:
 		button.focus_entered.connect(Audio.play.bind(&"ui_move", -6.0))
 		button.pressed.connect(Audio.play.bind(&"ui_select", -3.0))
-	for button: Button in [_start_button, _back_button]:
-		button.focus_entered.connect(_on_bottom_button_focused)
-	_show_map()
+	_continue_button.focus_entered.connect(_on_racer_buttons_focused)
+	_racer_back_button.focus_entered.connect(_on_racer_buttons_focused)
+	_start_button.focus_entered.connect(_on_map_buttons_focused)
+	_map_back_button.focus_entered.connect(_on_map_buttons_focused)
+	_build_map_cards()
 	_show_bots()
 	_show_main()
 
 
 func _process(delta: float) -> void:
 	_time += delta
-	if _screen == Screen.MAIN:
-		# Повільний обліт стартової арки.
-		var angle := 0.6 + _time * 0.1
-		var center := Vector3(0.0, 4.0, -60.0)
-		var from := center + Vector3(sin(angle) * 34.0, 9.0 + sin(_time * 0.3) * 2.0, cos(angle) * 34.0)
-		_camera.look_at_from_position(from, center)
-	else:
-		_turntable.rotation.y += delta * 0.6
+	match _screen:
+		Screen.MAIN:
+			# Повільний обліт стартової арки.
+			var angle := 0.6 + _time * 0.1
+			var center := Vector3(0.0, 4.0, -60.0)
+			var from := center + Vector3(sin(angle) * 34.0, 9.0 + sin(_time * 0.3) * 2.0, cos(angle) * 34.0)
+			_camera.look_at_from_position(from, center)
+		Screen.RACER:
+			_turntable.rotation.y += delta * 0.6
+		Screen.MAP:
+			# Обліт обраної траси: точку й висоту задає сама траса (Track.menu_preview_*).
+			var track := $TestTrack as Track
+			var center := track.menu_preview_center if track else Vector3(0.0, 0.0, -45.0)
+			var radius := track.menu_preview_radius if track else 62.0
+			var height := track.menu_preview_height if track else 26.0
+			var angle := 0.9 + _time * 0.12
+			var from := center + Vector3(sin(angle) * radius, height + sin(_time * 0.25) * 3.0, cos(angle) * radius)
+			# Погляд трохи ліворуч від центру — праворуч від списку трас лишається вільне місце для фону.
+			_camera.look_at_from_position(from, center)
+			_camera.look_at_from_position(from, center - _camera.global_basis.x * 18.0)
 
 
-## Екран вибору керуємо тут (а не в _unhandled_input), щоб стрілки не перехоплювала
-## стандартна навігація фокусу між кнопками: ↑/↓ — рядок, ←/→ — значення рядка.
-## На рядку кнопок ←/→ і Enter лишаємо кнопкам (НАЗАД / СТАРТ).
+## Екрани вибору керуємо тут (а не в _unhandled_input), щоб стрілки не перехоплювала
+## стандартна навігація фокусу між кнопками. На рядку кнопок ←/→ і Enter лишаємо кнопкам.
 func _input(event: InputEvent) -> void:
-	if _screen != Screen.SELECT:
-		return
-	if event.is_action_pressed(&"ui_up") or event.is_action_pressed(&"accelerate"):
-		_focus_row(wrapi(_row - 1, 0, Row.size()))
-	elif event.is_action_pressed(&"ui_down") or event.is_action_pressed(&"brake"):
-		_focus_row(wrapi(_row + 1, 0, Row.size()))
-	elif event.is_action_pressed(&"ui_cancel"):
+	match _screen:
+		Screen.RACER:
+			_input_racer(event)
+		Screen.MAP:
+			_input_map(event)
+
+
+## Екран гонщика: ←/→ — гонщик, Enter — далі, ↑/↓ — між гонщиком і кнопками.
+func _input_racer(event: InputEvent) -> void:
+	if event.is_action_pressed(&"ui_cancel"):
 		_show_main()
-	elif _row == Row.BUTTONS:
+	elif event.is_action_pressed(&"ui_up") or event.is_action_pressed(&"accelerate") \
+			or event.is_action_pressed(&"ui_down") or event.is_action_pressed(&"brake"):
+		_focus_racer_buttons(not _racer_buttons_focused)
+	elif _racer_buttons_focused:
 		return
 	elif event.is_action_pressed(&"ui_left") or event.is_action_pressed(&"steer_left"):
-		_change_row_value(_row, -1)
+		_change_racer(-1)
 	elif event.is_action_pressed(&"ui_right") or event.is_action_pressed(&"steer_right"):
-		_change_row_value(_row, 1)
+		_change_racer(1)
+	elif event.is_action_pressed(&"ui_accept"):
+		Audio.play(&"ui_select", -3.0)
+		get_viewport().set_input_as_handled()
+		_show_map_screen()
+		return
+	else:
+		return
+	get_viewport().set_input_as_handled()
+
+
+## Екран траси: ↑/↓ — траси, «БОТИ», кнопки; ←/→ — кількість ботів; Enter — старт.
+func _input_map(event: InputEvent) -> void:
+	var rows := _bots_row_index() + 2
+	if event.is_action_pressed(&"ui_cancel"):
+		_show_racer_screen()
+	elif event.is_action_pressed(&"ui_up") or event.is_action_pressed(&"accelerate"):
+		_focus_map_row(wrapi(_map_row - 1, 0, rows))
+	elif event.is_action_pressed(&"ui_down") or event.is_action_pressed(&"brake"):
+		_focus_map_row(wrapi(_map_row + 1, 0, rows))
+	elif _map_row == _buttons_row_index():
+		return
+	elif event.is_action_pressed(&"ui_left") or event.is_action_pressed(&"steer_left"):
+		if _map_row == _bots_row_index():
+			_change_bots(-1)
+	elif event.is_action_pressed(&"ui_right") or event.is_action_pressed(&"steer_right"):
+		if _map_row == _bots_row_index():
+			_change_bots(1)
 	elif event.is_action_pressed(&"ui_accept"):
 		# Позначаємо натискання обробленим ДО зміни сцени: після неї меню вже не в дереві.
 		get_viewport().set_input_as_handled()
@@ -134,60 +183,112 @@ func _show_main() -> void:
 	_screen = Screen.MAIN
 	_main_panel.visible = true
 	_select_panel.visible = false
+	_map_panel.visible = false
 	_showcase.visible = false
 	_race_button.grab_focus()
 
 
-func _show_select() -> void:
-	_screen = Screen.SELECT
+func _show_racer_screen() -> void:
+	_screen = Screen.RACER
 	_main_panel.visible = false
 	_select_panel.visible = true
+	_map_panel.visible = false
 	_showcase.visible = true
 	_show_racer()
-	_show_map()
+	_focus_racer_buttons(false, false)
+
+
+func _show_map_screen() -> void:
+	Game.selected_racer = Game.RACERS[_index]
+	_screen = Screen.MAP
+	_main_panel.visible = false
+	_select_panel.visible = false
+	_map_panel.visible = true
+	_showcase.visible = false
+	_time = 0.0
+	_map_racer_name.text = Game.selected_racer.display_name
 	_show_bots()
-	_focus_row(Row.RACER, false)
+	_focus_map_row(_map_index, false)
 
 
-## Переводить фокус на рядок і підсвічує його. Рядок кнопок — це звичайний фокус на «СТАРТ».
-func _focus_row(row: int, with_sound: bool = true) -> void:
-	_row = row as Row
-	if _row == Row.BUTTONS:
-		if not (_start_button.has_focus() or _back_button.has_focus()):
-			_start_button.grab_focus()   # звук дає сама кнопка (focus_entered)
+func _bots_row_index() -> int:
+	return Game.MAPS.size()
+
+
+func _buttons_row_index() -> int:
+	return Game.MAPS.size() + 1
+
+
+func _focus_racer_buttons(on_buttons: bool, with_sound: bool = true) -> void:
+	_racer_buttons_focused = on_buttons
+	if on_buttons:
+		if not (_continue_button.has_focus() or _racer_back_button.has_focus()):
+			_continue_button.grab_focus()   # звук дає сама кнопка (focus_entered)
 	else:
 		get_viewport().gui_release_focus()
 		if with_sound:
 			Audio.play(&"ui_move", -6.0)
-	_update_row_highlight()
+	_update_racer_highlight()
 
 
-func _on_bottom_button_focused() -> void:
-	_row = Row.BUTTONS
-	_update_row_highlight()
+func _on_racer_buttons_focused() -> void:
+	_racer_buttons_focused = true
+	_update_racer_highlight()
 
 
-func _on_row_gui_input(event: InputEvent, row: Row) -> void:
+## Світні стрілки біля моделі — коли вибір гонщика у фокусі.
+func _update_racer_highlight() -> void:
+	for arrow: Button in [_prev_button, _next_button]:
+		if not _racer_buttons_focused:
+			arrow.add_theme_stylebox_override(&"normal", arrow.get_theme_stylebox(&"focus"))
+		else:
+			arrow.remove_theme_stylebox_override(&"normal")
+	_counter_label.add_theme_color_override(&"font_color",
+		Color(1, 0.3, 0.8) if not _racer_buttons_focused else Color(0.3, 0.95, 1))
+
+
+## Переводить фокус на рядок екрана траси. Рядок картки траси одразу обирає цю трасу.
+func _focus_map_row(row: int, with_sound: bool = true) -> void:
+	_map_row = row
+	if row == _buttons_row_index():
+		if not (_start_button.has_focus() or _map_back_button.has_focus()):
+			_start_button.grab_focus()   # звук дає сама кнопка (focus_entered)
+	else:
+		get_viewport().gui_release_focus()
+		if row < Game.MAPS.size() and row != _map_index:
+			_select_map(row)
+		elif with_sound:
+			Audio.play(&"ui_move", -6.0)
+	_update_map_highlight()
+
+
+func _on_map_buttons_focused() -> void:
+	_map_row = _buttons_row_index()
+	_update_map_highlight()
+
+
+func _on_row_click(event: InputEvent, row_getter: Callable) -> void:
 	var click := event as InputEventMouseButton
-	if click and click.pressed and click.button_index == MOUSE_BUTTON_LEFT and _row != row:
-		_focus_row(row)
+	if click and click.pressed and click.button_index == MOUSE_BUTTON_LEFT:
+		var row: int = row_getter.call()
+		if _map_row != row:
+			_focus_map_row(row)
 
 
-## Клік мишею по ◀ / ▶: фокус на цей рядок і зміна значення.
-func _on_arrow(row: Row, step: int) -> void:
-	if _row != row:
-		_focus_row(row, false)
-	_change_row_value(row, step)
+func _on_map_card_input(event: InputEvent, index: int) -> void:
+	var click := event as InputEventMouseButton
+	if click and click.pressed and click.button_index == MOUSE_BUTTON_LEFT:
+		if click.double_click and index == _map_index:
+			_start_race()
+		elif _map_row != index:
+			_focus_map_row(index)
 
 
-func _change_row_value(row: Row, step: int) -> void:
-	match row:
-		Row.RACER:
-			_change_racer(step)
-		Row.MAP:
-			_change_map(step)
-		Row.BOTS:
-			_change_bots(step)
+## Клік мишею по ◀ / ▶ біля ботів: фокус на цей рядок і зміна значення.
+func _on_bots_arrow(step: int) -> void:
+	if _map_row != _bots_row_index():
+		_focus_map_row(_bots_row_index(), false)
+	_change_bots(step)
 
 
 func _change_racer(step: int) -> void:
@@ -196,17 +297,12 @@ func _change_racer(step: int) -> void:
 	_show_racer()
 
 
-## Наступна / попередня мапа (по колу). Поки мапа одна — нічого не змінюється.
-func _change_map(step: int) -> void:
-	if Game.MAPS.size() < 2:
-		return
+## Обирає трасу: фон меню — теж ця траса; подіум переїжджає туди, де йому місце на ній.
+func _select_map(index: int) -> void:
 	Audio.play(&"ui_move", -4.0)
-	_map_index = wrapi(_map_index + step, 0, Game.MAPS.size())
+	_map_index = index
 	Game.selected_map = Game.MAPS[_map_index]
-	_show_map()
-	# Фон меню — теж обрана траса; подіум переїжджає туди, де йому місце на цій трасі.
 	_place_showcase(Game.swap_in_selected_map($TestTrack))
-	_show_racer()
 
 
 ## Більше / менше ботів у межах Game.MIN_BOTS..Game.max_bots (без переходу по колу).
@@ -219,15 +315,73 @@ func _change_bots(step: int) -> void:
 	_show_bots()
 
 
-func _show_map() -> void:
-	var map: MapData = Game.MAPS[_map_index]
-	_map_name.text = map.display_name
-	_map_desc.text = map.description
-	# Одна мапа — стрілки тьмяні, але сам елемент той самий, що й для багатьох мап.
-	var can_switch := Game.MAPS.size() > 1
-	for arrow: Button in [_map_prev, _map_next]:
-		arrow.modulate.a = 1.0 if can_switch else 0.3
-		arrow.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if can_switch else Control.CURSOR_ARROW
+## Картки трас: назва, тип (коло / спринт), довжина і опис. Довжину й тип беремо зі сцени траси
+## (без додавання в дерево — місто й дорога тоді не будуються, це швидко).
+func _build_map_cards() -> void:
+	for i: int in Game.MAPS.size():
+		var map: MapData = Game.MAPS[i]
+		var card := PanelContainer.new()
+		card.theme_type_variation = &"SkillIdle"
+		card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override(&"separation", -1)
+		box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(box)
+		var title := Label.new()
+		title.theme_type_variation = &"GlitchLabel"
+		title.add_theme_font_size_override(&"font_size", 13)
+		title.text = map.display_name
+		var info := Label.new()
+		info.theme_type_variation = &"HudLabel"
+		info.add_theme_font_size_override(&"font_size", 9)
+		info.add_theme_color_override(&"font_color", Color(0.3, 0.95, 1))
+		info.text = _map_summary(map)
+		var desc := Label.new()
+		desc.add_theme_font_size_override(&"font_size", 8)
+		desc.add_theme_color_override(&"font_color", Color(0.75, 0.75, 0.85))
+		desc.text = map.description
+		desc.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		for label: Label in [title, info, desc]:
+			label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			box.add_child(label)
+		card.gui_input.connect(_on_map_card_input.bind(i))
+		_map_list.add_child(card)
+		_map_cards.append(card)
+
+
+## «Коло · 3 кола · 1,3 км» або «Спринт · 1 заїзд · 1,5 км».
+func _map_summary(map: MapData) -> String:
+	var scene := map.load_scene()
+	if scene == null:
+		return ""
+	var track := scene.instantiate() as Track
+	if track == null:
+		return ""
+	var path := track.get_node(^"TrackPath") as Path3D
+	var length := path.curve.get_baked_length()
+	var closed := track.closed
+	var distance := length if closed else length - track.start_offset - track.finish_runout
+	track.free()
+	var km := ("%.1f км" % (distance / 1000.0)).replace(".", ",")
+	if closed:
+		return "Коло · %d %s · %s" % [map.laps, _laps_word(map.laps), km]
+	return "Спринт · один заїзд · %s" % km
+
+
+## Підсвітка: обрана траса — неонова рамка (яскравіша, коли рядок у фокусі), інші — притушені.
+func _update_map_highlight() -> void:
+	for i: int in _map_cards.size():
+		var card := _map_cards[i]
+		var selected := i == _map_index
+		card.theme_type_variation = &"SkillReady" if selected else &"SkillIdle"
+		card.modulate = Color(1, 1, 1, 1) if selected else Color(0.7, 0.68, 0.78, 0.9)
+		if selected and _map_row != i:
+			card.modulate = Color(0.9, 0.9, 0.95, 1)
+		var title := card.get_child(0).get_child(0) as Label
+		title.text = ("▶ " if selected else "") + Game.MAPS[i].display_name
+		title.add_theme_color_override(&"font_color", Color(1, 0.85, 0.3) if selected else Color(0.85, 0.85, 0.95))
+	_bots_row.theme_type_variation = &"SkillReady" if _map_row == _bots_row_index() else &"SkillIdle"
+	_map_counter.text = "%d / %d" % [_map_index + 1, Game.MAPS.size()]
 
 
 func _show_bots() -> void:
@@ -238,19 +392,17 @@ func _show_bots() -> void:
 	_bots_next.modulate.a = 1.0 if count < Game.max_bots else 0.3
 
 
-## Підсвітка рядка у фокусі: неонова рамка (як у готового скіла) для рядків налаштувань,
-## світні стрілки біля моделі — для рядка гонщика.
-func _update_row_highlight() -> void:
-	_map_row.theme_type_variation = &"SkillReady" if _row == Row.MAP else &"SkillIdle"
-	_bots_row.theme_type_variation = &"SkillReady" if _row == Row.BOTS else &"SkillIdle"
-	var racer_focused := _row == Row.RACER
-	for arrow: Button in [_prev_button, _next_button]:
-		if racer_focused:
-			arrow.add_theme_stylebox_override(&"normal", arrow.get_theme_stylebox(&"focus"))
-		else:
-			arrow.remove_theme_stylebox_override(&"normal")
-	_counter_label.add_theme_color_override(&"font_color",
-		Color(1, 0.3, 0.8) if racer_focused else Color(0.3, 0.95, 1))
+## «коло / кола / кіл» для числа.
+static func _laps_word(n: int) -> String:
+	var last_two := n % 100
+	var last := n % 10
+	if last_two >= 11 and last_two <= 14:
+		return "кіл"
+	if last == 1:
+		return "коло"
+	if last >= 2 and last <= 4:
+		return "кола"
+	return "кіл"
 
 
 ## «машина / машини / машин» для числа.

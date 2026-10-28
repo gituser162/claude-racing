@@ -50,6 +50,10 @@ signal checkpoint_passed(car: Car, index: int)
 @export var keep_clear: PackedVector3Array = PackedVector3Array()
 ## Де в меню стоїть подіум з моделлю гонщика (на дорозі біля старту).
 @export var menu_showcase: Vector3 = Vector3(0.0, 0.0, -30.0)
+## Екран вибору траси: камера облітає точку center на відстані radius і висоті height над нею.
+@export var menu_preview_center: Vector3 = Vector3(0.0, 0.0, -45.0)
+@export var menu_preview_radius: float = 85.0
+@export var menu_preview_height: float = 38.0
 
 @export_group("Бар'єри")
 ## SHARP_CORNERS — лише із зовнішнього боку крутих поворотів (естакада);
