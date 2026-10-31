@@ -12,7 +12,7 @@ dest_files=["res://.godot/imported/into_the_void.mp3-b4ae9c22e4eec5fc632f035efe3
 
 [params]
 
-loop=true
+loop=false
 loop_offset=0
 bpm=0
 beat_count=0

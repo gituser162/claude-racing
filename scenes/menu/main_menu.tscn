@@ -7,6 +7,7 @@
 [ext_resource type="Theme" path="res://resources/ui/neon_theme.tres" id="6_theme"]
 [ext_resource type="Shader" path="res://resources/shaders/psx.gdshader" id="7_psx"]
 [ext_resource type="Script" path="res://scripts/ui/volume_controls.gd" id="8_volume"]
+[ext_resource type="Script" path="res://scripts/ui/music_controls.gd" id="9_music"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky"]
 sky_top_color = Color(0.01, 0.01, 0.04, 1)
@@ -182,6 +183,10 @@ theme_override_constants/separation = 8
 layout_mode = 2
 text = "ГОНКА"
 
+[node name="TracksButton" type="Button" parent="UI/MainPanel/Buttons"]
+layout_mode = 2
+text = "ТРЕКИ"
+
 [node name="QuitButton" type="Button" parent="UI/MainPanel/Buttons"]
 layout_mode = 2
 text = "ВИХІД"
@@ -190,6 +195,11 @@ text = "ВИХІД"
 layout_mode = 2
 theme_override_constants/separation = 4
 script = ExtResource("8_volume")
+
+[node name="Music" type="HBoxContainer" parent="UI/MainPanel/Buttons"]
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 2
+script = ExtResource("9_music")
 
 [node name="Hint" type="Label" parent="UI/MainPanel"]
 layout_mode = 1
@@ -532,6 +542,93 @@ grow_vertical = 0
 theme_override_colors/font_color = Color(0.7, 0.7, 0.8, 1)
 theme_override_font_sizes/font_size = 10
 text = "↑/↓ вибір · ←/→ боти · Enter старт · Esc назад"
+
+[node name="TracksPanel" type="Control" parent="UI"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("6_theme")
+
+[node name="Header" type="Label" parent="UI/TracksPanel"]
+theme_type_variation = &"GlitchLabel"
+layout_mode = 0
+offset_left = 20.0
+offset_top = 12.0
+offset_right = 320.0
+offset_bottom = 40.0
+theme_override_colors/font_color = Color(1, 0.3, 0.8, 1)
+theme_override_font_sizes/font_size = 22
+text = "ТРЕКИ"
+
+[node name="Counter" type="Label" parent="UI/TracksPanel"]
+theme_type_variation = &"HudLabel"
+layout_mode = 0
+offset_left = 22.0
+offset_top = 40.0
+offset_right = 300.0
+offset_bottom = 56.0
+theme_override_colors/font_color = Color(0.3, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 11
+text = "грають 12 з 12"
+
+[node name="Scroll" type="ScrollContainer" parent="UI/TracksPanel"]
+layout_mode = 1
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 60.0
+offset_right = 420.0
+offset_bottom = -52.0
+grow_vertical = 2
+horizontal_scroll_mode = 0
+
+[node name="List" type="VBoxContainer" parent="UI/TracksPanel/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 3
+
+[node name="Bottom" type="HBoxContainer" parent="UI/TracksPanel"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -290.0
+offset_top = -44.0
+offset_right = -14.0
+offset_bottom = -14.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_constants/separation = 8
+alignment = 2
+
+[node name="AllButton" type="Button" parent="UI/TracksPanel/Bottom"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "УВІМКНУТИ ВСІ"
+
+[node name="BackButton" type="Button" parent="UI/TracksPanel/Bottom"]
+layout_mode = 2
+text = "НАЗАД"
+
+[node name="TracksHint" type="Label" parent="UI/TracksPanel"]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -30.0
+offset_right = 360.0
+offset_bottom = -12.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.7, 0.7, 0.8, 1)
+theme_override_font_sizes/font_size = 10
+text = "↑/↓ вибір · Enter вкл/викл · → грати зараз · Esc назад"
 
 [node name="Rain" type="CPUParticles3D" parent="Camera3D"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9, -10)

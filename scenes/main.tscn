@@ -9,6 +9,7 @@
 [ext_resource type="Theme" path="res://resources/ui/neon_theme.tres" id="7_theme"]
 [ext_resource type="Shader" uid="uid://nxmo7kc38uyi" path="res://resources/shaders/psx_glow.gdshader" id="90_glow"]
 [ext_resource type="Script" path="res://scripts/ui/volume_controls.gd" id="8_volume"]
+[ext_resource type="Script" path="res://scripts/ui/music_controls.gd" id="9_music"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky"]
 sky_top_color = Color(0.01, 0.01, 0.04, 1)
@@ -351,10 +352,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -100.0
-offset_top = -95.0
-offset_right = 100.0
-offset_bottom = 95.0
+offset_left = -130.0
+offset_top = -110.0
+offset_right = 130.0
+offset_bottom = 110.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -386,3 +387,7 @@ text = "ГОЛОВНЕ МЕНЮ"
 layout_mode = 2
 theme_override_constants/separation = 4
 script = ExtResource("8_volume")
+
+[node name="Music" type="HBoxContainer" parent="UI/Pause/Panel/VBox"]
+layout_mode = 2
+script = ExtResource("9_music")

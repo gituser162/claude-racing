@@ -123,6 +123,8 @@ func _ready() -> void:
 	_results_panel.visible = false
 	_wrong_way_label.visible = false
 	_skills_box.visible = Game.selected_map.skills_enabled
+	# Який трек зараз грає — показуємо на старті (далі — при кожній зміні треку).
+	Audio.announce_current()
 
 
 func _on_bumped(a: Car, b: Car, strength: float) -> void:

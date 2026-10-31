@@ -1,5 +1,5 @@
 extends Node3D
-## Головне меню → вибір гонщика → вибір траси й кількості ботів → гонка.
+## Головне меню → вибір гонщика → вибір траси й кількості ботів → гонка; з головного меню — «ТРЕКИ» (які пісні грають).
 ## На фоні — траса обраної мапи з нічним містом: у головному меню камера повільно облітає старт,
 ## на екрані гонщика модель обертається на подіумі, на екрані траси камера облітає обрану трасу.
 
@@ -7,7 +7,7 @@ const RACE_SCENE: String = "res://scenes/main.tscn"
 const PSX_SHADER: Shader = preload("res://resources/shaders/psx.gdshader")
 const STAT_NAMES: Array[String] = ["Швидкість", "Розгін", "Керування", "Вага"]
 
-enum Screen { MAIN, RACER, MAP }
+enum Screen { MAIN, RACER, MAP, TRACKS }
 
 @onready var _camera: Camera3D = $Camera3D
 @onready var _turntable: Node3D = $Showcase/Turntable
@@ -15,6 +15,14 @@ enum Screen { MAIN, RACER, MAP }
 @onready var _main_panel: Control = $UI/MainPanel
 @onready var _race_button: Button = $UI/MainPanel/Buttons/RaceButton
 @onready var _quit_button: Button = $UI/MainPanel/Buttons/QuitButton
+@onready var _tracks_button: Button = $UI/MainPanel/Buttons/TracksButton
+# Екран треків.
+@onready var _tracks_panel: Control = $UI/TracksPanel
+@onready var _tracks_counter: Label = $UI/TracksPanel/Counter
+@onready var _tracks_scroll: ScrollContainer = $UI/TracksPanel/Scroll
+@onready var _tracks_list: VBoxContainer = $UI/TracksPanel/Scroll/List
+@onready var _tracks_all_button: Button = $UI/TracksPanel/Bottom/AllButton
+@onready var _tracks_back_button: Button = $UI/TracksPanel/Bottom/BackButton
 # Екран гонщика.
 @onready var _select_panel: Control = $UI/SelectPanel
 @onready var _continue_button: Button = $UI/SelectPanel/Bottom/ContinueButton
@@ -50,6 +58,9 @@ var _racer_buttons_focused: bool = false
 var _time: float = 0.0
 var _model: Node3D
 var _map_cards: Array[PanelContainer] = []
+## Екран треків: рядки (по одному на трек) і рядок у фокусі (останній + 1 — кнопки).
+var _track_rows: Array[PanelContainer] = []
+var _track_row: int = 0
 
 
 ## Фон меню — траса обраної мапи (ставиться до входу сцени в дерево, як і в гонці).
@@ -70,6 +81,12 @@ func _ready() -> void:
 	_index = maxi(Game.RACERS.find(Game.selected_racer), 0)
 	_map_index = maxi(Game.MAPS.find(Game.selected_map), 0)
 	_race_button.pressed.connect(_show_racer_screen)
+	_tracks_button.pressed.connect(_show_tracks_screen)
+	_tracks_back_button.pressed.connect(_show_main)
+	_tracks_all_button.pressed.connect(_enable_all_tracks)
+	_tracks_all_button.focus_entered.connect(_on_track_buttons_focused)
+	_tracks_back_button.focus_entered.connect(_on_track_buttons_focused)
+	Audio.track_changed.connect(func(_i: int) -> void: _update_track_rows())
 	_quit_button.pressed.connect(func() -> void: get_tree().quit())
 	# У браузері «Вихід» не має сенсу.
 	_quit_button.visible = not OS.has_feature("web")
@@ -82,7 +99,7 @@ func _ready() -> void:
 	_bots_prev.pressed.connect(_on_bots_arrow.bind(-1))
 	_bots_next.pressed.connect(_on_bots_arrow.bind(1))
 	_bots_row.gui_input.connect(_on_row_click.bind(_bots_row_index))
-	for button: Button in [_race_button, _quit_button, _continue_button, _racer_back_button, _start_button, _map_back_button]:
+	for button: Button in [_race_button, _tracks_button, _quit_button, _continue_button, _racer_back_button, _start_button, _map_back_button, _tracks_all_button, _tracks_back_button]:
 		button.focus_entered.connect(Audio.play.bind(&"ui_move", -6.0))
 		button.pressed.connect(Audio.play.bind(&"ui_select", -3.0))
 	_continue_button.focus_entered.connect(_on_racer_buttons_focused)
@@ -90,6 +107,7 @@ func _ready() -> void:
 	_start_button.focus_entered.connect(_on_map_buttons_focused)
 	_map_back_button.focus_entered.connect(_on_map_buttons_focused)
 	_build_map_cards()
+	_build_track_rows()
 	_show_bots()
 	_show_main()
 
@@ -97,7 +115,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	match _screen:
-		Screen.MAIN:
+		Screen.MAIN, Screen.TRACKS:
 			# Повільний обліт стартової арки.
 			var angle := 0.6 + _time * 0.1
 			var center := Vector3(0.0, 4.0, -60.0)
@@ -126,6 +144,28 @@ func _input(event: InputEvent) -> void:
 			_input_racer(event)
 		Screen.MAP:
 			_input_map(event)
+		Screen.TRACKS:
+			_input_tracks(event)
+
+
+## Екран треків: ↑/↓ — трек, Enter / пробіл — увімкнути/вимкнути, → — грати зараз, Esc — назад.
+func _input_tracks(event: InputEvent) -> void:
+	var rows := _track_rows.size() + 1
+	if event.is_action_pressed(&"ui_cancel"):
+		_show_main()
+	elif event.is_action_pressed(&"ui_up") or event.is_action_pressed(&"accelerate"):
+		_focus_track_row(wrapi(_track_row - 1, 0, rows))
+	elif event.is_action_pressed(&"ui_down") or event.is_action_pressed(&"brake"):
+		_focus_track_row(wrapi(_track_row + 1, 0, rows))
+	elif _track_row >= _track_rows.size():
+		return
+	elif event.is_action_pressed(&"ui_accept"):
+		_toggle_track(_track_row)
+	elif event.is_action_pressed(&"ui_right") or event.is_action_pressed(&"steer_right"):
+		_play_track_now(_track_row)
+	else:
+		return
+	get_viewport().set_input_as_handled()
 
 
 ## Екран гонщика: ←/→ — гонщик, Enter — далі, ↑/↓ — між гонщиком і кнопками.
@@ -180,16 +220,27 @@ func _input_map(event: InputEvent) -> void:
 
 
 func _show_main() -> void:
+	var from_tracks := _screen == Screen.TRACKS
 	_screen = Screen.MAIN
 	_main_panel.visible = true
 	_select_panel.visible = false
 	_map_panel.visible = false
+	_tracks_panel.visible = false
 	_showcase.visible = false
-	_race_button.grab_focus()
+	(_tracks_button if from_tracks else _race_button).grab_focus()
+
+
+func _show_tracks_screen() -> void:
+	_screen = Screen.TRACKS
+	_main_panel.visible = false
+	_tracks_panel.visible = true
+	_update_track_rows()
+	_focus_track_row(maxi(Audio.current_track, 0), false)
 
 
 func _show_racer_screen() -> void:
 	_screen = Screen.RACER
+	_tracks_panel.visible = false
 	_main_panel.visible = false
 	_select_panel.visible = true
 	_map_panel.visible = false
@@ -391,6 +442,135 @@ func _show_bots() -> void:
 	_bots_desc.text = "%d %s на старті" % [count + 1, _cars_word(count + 1)]
 	_bots_prev.modulate.a = 1.0 if count > Game.MIN_BOTS else 0.3
 	_bots_next.modulate.a = 1.0 if count < Game.max_bots else 0.3
+
+
+## Рядки екрана треків: прапорець ■/□, назва й виконавець, позначка «грає», кнопка ▶ (грати зараз).
+func _build_track_rows() -> void:
+	for i: int in Audio.track_count():
+		var track: Dictionary = Audio.get_track(i)
+		var row := PanelContainer.new()
+		row.theme_type_variation = &"SkillIdle"
+		row.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		var box := HBoxContainer.new()
+		box.add_theme_constant_override(&"separation", 6)
+		box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(box)
+		var check := Label.new()
+		check.add_theme_font_size_override(&"font_size", 12)
+		check.custom_minimum_size = Vector2(12, 0)
+		check.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		var texts := VBoxContainer.new()
+		texts.add_theme_constant_override(&"separation", -3)
+		texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		texts.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var title := Label.new()
+		title.theme_type_variation = &"GlitchLabel"
+		title.add_theme_font_size_override(&"font_size", 11)
+		title.text = track.title
+		title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		var artist := Label.new()
+		artist.add_theme_font_size_override(&"font_size", 8)
+		artist.text = track.artist
+		artist.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		texts.add_child(title)
+		texts.add_child(artist)
+		var playing := Label.new()
+		playing.theme_type_variation = &"HudLabel"
+		playing.add_theme_font_size_override(&"font_size", 8)
+		playing.add_theme_color_override(&"font_color", Color(0.3, 0.95, 1))
+		playing.text = "♪ ГРАЄ"
+		playing.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		var play := Button.new()
+		play.text = "▶"
+		play.flat = true
+		play.focus_mode = Control.FOCUS_NONE
+		play.tooltip_text = "Грати зараз"
+		play.custom_minimum_size = Vector2(18, 0)
+		play.add_theme_font_size_override(&"font_size", 11)
+		play.add_theme_color_override(&"font_color", Color(0.3, 0.95, 1))
+		play.add_theme_color_override(&"font_hover_color", Color(1, 0.3, 0.8))
+		play.pressed.connect(_play_track_now.bind(i))
+		for label: Label in [check, title, artist, playing]:
+			label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(check)
+		box.add_child(texts)
+		box.add_child(playing)
+		box.add_child(play)
+		row.gui_input.connect(_on_track_row_input.bind(i))
+		row.set_meta(&"check", check)
+		row.set_meta(&"title", title)
+		row.set_meta(&"artist", artist)
+		row.set_meta(&"playing", playing)
+		_tracks_list.add_child(row)
+		_track_rows.append(row)
+
+
+func _on_track_row_input(event: InputEvent, index: int) -> void:
+	var click := event as InputEventMouseButton
+	if click and click.pressed and click.button_index == MOUSE_BUTTON_LEFT:
+		_focus_track_row(index, false)
+		_toggle_track(index)
+
+
+func _focus_track_row(row: int, with_sound: bool = true) -> void:
+	_track_row = row
+	if row >= _track_rows.size():
+		if not (_tracks_all_button.has_focus() or _tracks_back_button.has_focus()):
+			_tracks_back_button.grab_focus()   # звук дає сама кнопка (focus_entered)
+	else:
+		get_viewport().gui_release_focus()
+		# Відкладено: одразу після показу екрана розмітка ще не порахована.
+		_tracks_scroll.ensure_control_visible.call_deferred(_track_rows[row])
+		if with_sound:
+			Audio.play(&"ui_move", -6.0)
+	_update_track_rows()
+
+
+func _on_track_buttons_focused() -> void:
+	_track_row = _track_rows.size()
+	_update_track_rows()
+
+
+## Увімкнути / вимкнути трек. Останній увімкнений вимкнути не можна — тоді лише «бип» і підказка.
+func _toggle_track(index: int) -> void:
+	if Audio.set_track_enabled(index, not Audio.is_track_enabled(index)):
+		Audio.play(&"ui_select", -4.0)
+	else:
+		Audio.play(&"hit", -10.0)
+		_tracks_counter.text = "хоч один трек має грати"
+		return
+	_update_track_rows()
+
+
+func _play_track_now(index: int) -> void:
+	Audio.play(&"ui_select", -4.0)
+	Audio.play_track(index)
+	_update_track_rows()
+
+
+func _enable_all_tracks() -> void:
+	for i: int in Audio.track_count():
+		Audio.set_track_enabled(i, true)
+	_update_track_rows()
+
+
+func _update_track_rows() -> void:
+	if _track_rows.is_empty():
+		return
+	for i: int in _track_rows.size():
+		var row := _track_rows[i]
+		var on := Audio.is_track_enabled(i)
+		var focused := _screen == Screen.TRACKS and i == _track_row
+		row.theme_type_variation = &"SkillReady" if focused else &"SkillIdle"
+		var check := row.get_meta(&"check") as Label
+		check.text = "■" if on else "□"
+		check.add_theme_color_override(&"font_color", Color(1, 0.3, 0.8) if on else Color(0.5, 0.5, 0.6))
+		(row.get_meta(&"title") as Label).add_theme_color_override(&"font_color",
+			Color(1, 0.85, 0.3) if on else Color(0.55, 0.55, 0.65))
+		(row.get_meta(&"artist") as Label).add_theme_color_override(&"font_color",
+			Color(0.85, 0.85, 0.95) if on else Color(0.5, 0.5, 0.6))
+		(row.get_meta(&"playing") as Label).visible = i == Audio.current_track
+	_tracks_counter.text = "грають %d з %d" % [Audio.enabled_count(), Audio.track_count()]
 
 
 ## «коло / кола / кіл» для числа.

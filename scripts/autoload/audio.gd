@@ -1,9 +1,31 @@
 extends Node
-## Звук (autoload «Audio»): фонова музика, дощ і короткі ефекти.
+## Звук (autoload «Audio»): плейлист музики, дощ і короткі ефекти.
 ## Музика й дощ грають безперервно між меню й гонкою.
 ## Шини: Music (музика), SFX (усе інше) — гучність можна міняти окремо.
+##
+## Музика — плейлист TRACKS у випадковому порядку (без повторів, поки не прозвучать усі увімкнені).
+## Трек закінчився — наступний. [ / ] — попередній / наступний (дії music_prev / music_next).
+## Які треки грають — обирає гравець (екран «ТРЕКИ» в меню), вимкнені зберігаються в settings.cfg.
 
-const MUSIC: AudioStream = preload("res://assets/audio/music/into_the_void.mp3")
+signal track_changed(index: int)
+
+## Треки: id (для налаштувань), виконавець, назва, файл і поправка гучності (дБ).
+## Файли вантажаться лише перед відтворенням (load), щоб не тримати в пам'яті всі одразу.
+## Новий трек — рядок тут (ogg Vorbis ~96 кбіт/с, гучність вирівняна до ~-9 LUFS; див. DESIGN.md).
+const TRACKS: Array[Dictionary] = [
+	{"id": &"into_the_void", "artist": "Artful", "title": "Blade x Into The Void (feat. Jordan + D'Angelo)", "path": "res://assets/audio/music/into_the_void.mp3", "gain_db": -3.0},
+	{"id": &"85_again", "artist": "Robert Parker", "title": "'85 Again (feat. Miss K)", "path": "res://assets/audio/music/robert_parker_85_again.ogg", "gain_db": 0.0},
+	{"id": &"ares", "artist": "Processor", "title": "A R E S", "path": "res://assets/audio/music/processor_ares.ogg", "gain_db": 0.0},
+	{"id": &"bang_bang_bang", "artist": "lil yappa, BBpanzu", "title": "Bang Bang Bang (lil yappa / minus b remix)", "path": "res://assets/audio/music/lil_yappa_bang_bang_bang.ogg", "gain_db": 0.0},
+	{"id": &"beware_the_beast", "artist": "Carpenter Brut, Mat McNerney", "title": "Beware The Beast", "path": "res://assets/audio/music/carpenter_brut_beware_the_beast.ogg", "gain_db": 0.0},
+	{"id": &"sugarcrash", "artist": "Bemax", "title": "SugarCrash! (Bemax Remix)", "path": "res://assets/audio/music/bemax_sugarcrash.ogg", "gain_db": 0.0},
+	{"id": &"caramel_jester", "artist": "UMBRELLA", "title": "CARAMEL JESTER", "path": "res://assets/audio/music/umbrella_caramel_jester.ogg", "gain_db": 0.0},
+	{"id": &"division_ruine", "artist": "Carpenter Brut", "title": "Division Ruine", "path": "res://assets/audio/music/carpenter_brut_division_ruine.ogg", "gain_db": 0.0},
+	{"id": &"turbo_killer", "artist": "Carpenter Brut", "title": "Turbo Killer", "path": "res://assets/audio/music/carpenter_brut_turbo_killer.ogg", "gain_db": 0.0},
+	{"id": &"cry_for_me_funk", "artist": "DJ ZENKI", "title": "CRY FOR ME FUNK", "path": "res://assets/audio/music/dj_zenki_cry_for_me_funk.ogg", "gain_db": 0.0},
+	{"id": &"sledge", "artist": "Dance with the Dead", "title": "Sledge", "path": "res://assets/audio/music/dance_with_the_dead_sledge.ogg", "gain_db": 0.0},
+	{"id": &"hex", "artist": "Dance with the Dead", "title": "Hex", "path": "res://assets/audio/music/dance_with_the_dead_hex.ogg", "gain_db": 0.0},
+]
 ## Явний список звуків, щоб працювало і в експорті (зокрема у браузері).
 const SFX: Dictionary = {
 	&"beep": preload("res://assets/audio/sfx/beep.wav"),
@@ -46,7 +68,17 @@ const SETTINGS_PATH: String = "user://settings.cfg"
 var music_level: float = 0.8
 var sfx_level: float = 0.8
 
+## Індекс треку, що грає зараз (у TRACKS), або -1.
+var current_track: int = -1
+
 var _music: AudioStreamPlayer
+## Вимкнені гравцем треки (id → true).
+var _disabled: Dictionary = {}
+## Порядок відтворення (індекси TRACKS) і позиція в ньому; «назад» іде цим же порядком.
+var _order: Array[int] = []
+var _order_pos: int = -1
+## Плашка «зараз грає» (показується при зміні треку).
+var _now_playing: CanvasLayer
 var _rain: AudioStreamPlayer
 var _pool: Array[AudioStreamPlayer] = []
 var _pool_3d: Array[AudioStreamPlayer3D] = []
@@ -60,8 +92,11 @@ func _ready() -> void:
 	# Петлі двигуна й дощу задані в налаштуваннях імпорту (.wav.import → loop_mode).
 	# Музика зациклена в налаштуваннях імпорту (.mp3.import → loop=true).
 	_music = _player(&"Music", music_volume_db)
-	_music.stream = MUSIC
-	_music.play()
+	_music.finished.connect(next_track)
+	_now_playing = load("res://scripts/ui/now_playing.gd").new()
+	add_child(_now_playing)
+	_reshuffle(-1)
+	_play_order_pos(0, false)
 	_rain = _player(&"SFX", rain_volume_db)
 	_rain.stream = SFX[&"rain_loop"]
 	_rain.play()
@@ -75,6 +110,118 @@ func _ready() -> void:
 		p.process_mode = Node.PROCESS_MODE_PAUSABLE
 		add_child(p)
 		_pool_3d.append(p)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"music_next"):
+		next_track()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed(&"music_prev"):
+		prev_track()
+		get_viewport().set_input_as_handled()
+
+
+## Показати плашку «зараз грає» з поточним треком (наприклад, на старті гонки).
+func announce_current() -> void:
+	_now_playing.show_track(current_track)
+
+
+func track_count() -> int:
+	return TRACKS.size()
+
+
+## Дані треку: {id, artist, title, path, gain_db}.
+func get_track(index: int) -> Dictionary:
+	return TRACKS[index] if index >= 0 and index < TRACKS.size() else {}
+
+
+func is_track_enabled(index: int) -> bool:
+	return not _disabled.has(TRACKS[index].id)
+
+
+func enabled_count() -> int:
+	var count := 0
+	for i: int in TRACKS.size():
+		if is_track_enabled(i):
+			count += 1
+	return count
+
+
+## Вмикає / вимикає трек. Останній увімкнений вимкнути не можна (повертає false).
+## Якщо вимкнули той, що грає, — одразу наступний.
+func set_track_enabled(index: int, enabled: bool) -> bool:
+	if enabled == is_track_enabled(index):
+		return true
+	if not enabled and enabled_count() <= 1:
+		return false
+	if enabled:
+		_disabled.erase(TRACKS[index].id)
+	else:
+		_disabled[TRACKS[index].id] = true
+	_save_settings()
+	_reshuffle(current_track)
+	if not enabled and index == current_track:
+		next_track()
+	return true
+
+
+## Наступний трек (за поточним випадковим порядком; коли всі прозвучали — новий порядок).
+func next_track() -> void:
+	if _order_pos + 1 >= _order.size():
+		_reshuffle(-1, current_track)
+		_play_order_pos(0)
+	else:
+		_play_order_pos(_order_pos + 1)
+
+
+## Попередній трек; якщо поточний грає довше 4 с — спершу з початку (як у плеєрах).
+func prev_track() -> void:
+	if _music.playing and _music.get_playback_position() > 4.0:
+		_music.play(0.0)
+		_now_playing.show_track(current_track)
+		return
+	_play_order_pos(posmod(_order_pos - 1, _order.size()))
+
+
+## Грати конкретний трек зараз (з екрана «ТРЕКИ»). Вмикає його, якщо був вимкнений.
+func play_track(index: int) -> void:
+	set_track_enabled(index, true)
+	_reshuffle(index)
+	_play_order_pos(0)
+
+
+## Новий випадковий порядок з увімкнених треків. first — поставити першим (якщо увімкнений),
+## avoid_first — не починати з нього (щоб той самий трек не прозвучав двічі поспіль).
+func _reshuffle(first: int, avoid_first: int = -1) -> void:
+	_order.clear()
+	for i: int in TRACKS.size():
+		if is_track_enabled(i) and i != first:
+			_order.append(i)
+	_order.shuffle()
+	if first >= 0 and is_track_enabled(first):
+		_order.push_front(first)
+	elif avoid_first >= 0 and _order.size() > 1 and _order[0] == avoid_first:
+		_order.append(_order.pop_front())
+	_order_pos = 0 if first >= 0 and is_track_enabled(first) else -1
+
+
+func _play_order_pos(pos: int, announce: bool = true) -> void:
+	if _order.is_empty():
+		return
+	_order_pos = clampi(pos, 0, _order.size() - 1)
+	var index := _order[_order_pos]
+	var track: Dictionary = TRACKS[index]
+	var stream := load(track.path) as AudioStream
+	if stream == null:
+		push_error("Музика: не вдалося завантажити %s" % track.path)
+		return
+	current_track = index
+	_music.stream = stream
+	_music.volume_db = music_volume_db + float(track.gain_db)
+	_music.play()
+	track_changed.emit(index)
+	if announce:
+		_now_playing.show_track(index)
 
 
 func set_music_level(level: float) -> void:
@@ -102,6 +249,11 @@ func _load_settings() -> void:
 	if config.load(SETTINGS_PATH) == OK:
 		music_level = config.get_value("audio", "music", music_level)
 		sfx_level = config.get_value("audio", "sfx", sfx_level)
+		for id: Variant in config.get_value("music", "disabled", []):
+			_disabled[StringName(str(id))] = true
+		# Хоч один трек має грати.
+		if enabled_count() == 0:
+			_disabled.clear()
 	_apply_bus(&"Music", music_level)
 	_apply_bus(&"SFX", sfx_level)
 
@@ -110,6 +262,10 @@ func _save_settings() -> void:
 	var config := ConfigFile.new()
 	config.set_value("audio", "music", music_level)
 	config.set_value("audio", "sfx", sfx_level)
+	var disabled: PackedStringArray = []
+	for id: StringName in _disabled:
+		disabled.append(String(id))
+	config.set_value("music", "disabled", disabled)
 	config.save(SETTINGS_PATH)
 
 
