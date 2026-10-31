@@ -64,6 +64,10 @@ func _build_tower() -> void:
 	mat.shader = Track.BUILDING_SHADER
 	mat.set_shader_parameter(&"lit_ratio", 0.45)
 	mat.set_shader_parameter(&"ground_y", _track.floor_base_y)
+	# Уся вежа — «еквалайзер» під музику: вікна-стовпчики від землі до даху.
+	mat.set_shader_parameter(&"music_eq_ratio", 1.0)
+	mat.set_shader_parameter(&"eq_base_y", bottom)
+	mat.set_shader_parameter(&"eq_height", top - bottom)
 	# Місто цієї мапи теж стоїть на землі далеко внизу — вікна до самого низу.
 	var city := _track.get_node_or_null(^"City")
 	if city and city.get_child_count() > 0:

@@ -15,6 +15,10 @@ signal beat(strength: float)
 const BEAT_MAPS := preload("res://scripts/autoload/beat_maps.gd")
 ## Як швидко згасає спалах після біта (1/с): ~0,15 с до половини.
 const BEAT_DECAY: float = 7.0
+## На скільки раніше запускати спалах, щоб він з'явився на екрані разом з ударом (кадр малюється ~2 кадри).
+const VISUAL_LEAD: float = 0.03
+## Межі 8 смуг спектра для будинків-«еквалайзерів», Гц.
+const SPECTRUM_BANDS: Array[float] = [30.0, 70.0, 140.0, 280.0, 560.0, 1100.0, 2200.0, 4500.0, 11000.0]
 
 ## Треки: id (для налаштувань), виконавець, назва, файл і поправка гучності (дБ).
 ## Файли вантажаться лише перед відтворенням (load), щоб не тримати в пам'яті всі одразу.
@@ -93,6 +97,15 @@ var _beats: PackedFloat32Array = PackedFloat32Array()
 var _beat_index: int = 0
 ## Поточний спалах під біт (0..1), згасає; іде в шейдери як global beat_pulse.
 var beat_pulse: float = 0.0
+## Світлова хвиля: звідки, скільки секунд минуло, сила.
+var _wave_origin: Vector3 = Vector3.ZERO
+var _wave_time: float = 100.0
+var _wave_strength: float = 0.0
+## Аналізатор спектра на шині Music і 8 смуг 0..1 (з недавнім максимумом кожної).
+var _spectrum: AudioEffectSpectrumAnalyzerInstance
+var _bands: PackedFloat32Array = PackedFloat32Array([0, 0, 0, 0, 0, 0, 0, 0])
+var _band_peak: PackedFloat32Array = PackedFloat32Array([0, 0, 0, 0, 0, 0, 0, 0])
+var _band_mean: PackedFloat32Array = PackedFloat32Array([0, 0, 0, 0, 0, 0, 0, 0])
 var _rain: AudioStreamPlayer
 var _pool: Array[AudioStreamPlayer] = []
 var _pool_3d: Array[AudioStreamPlayer3D] = []
@@ -106,6 +119,7 @@ func _ready() -> void:
 	# Петлі двигуна й дощу задані в налаштуваннях імпорту (.wav.import → loop_mode).
 	# Музика зациклена в налаштуваннях імпорту (.mp3.import → loop=true).
 	_music = _player(&"Music", music_volume_db)
+	_add_spectrum_analyzer()
 	_music.finished.connect(next_track)
 	_now_playing = load("res://scripts/ui/now_playing.gd").new()
 	add_child(_now_playing)
@@ -126,29 +140,72 @@ func _ready() -> void:
 		_pool_3d.append(p)
 
 
-## Біти: порівнюємо позицію відтворення (з поправкою на затримку звуку) з картою бітів треку.
+## Біти: порівнюємо позицію відтворення (з поправкою на затримку звуку й картинки) з картою бітів треку.
+## Карта — трійки [час, сила, перша доля такту]. На першій долі — ще й світлова хвиля по вікнах міста.
 func _process(delta: float) -> void:
 	beat_pulse *= exp(-BEAT_DECAY * delta)
+	_wave_time += delta
 	if _music.playing and not _beats.is_empty():
-		var t := _music.get_playback_position() + AudioServer.get_time_since_last_mix() - AudioServer.get_output_latency()
+		# Звук чути через output_latency після мікшування, а кадр з'являється на екрані через ~VISUAL_LEAD —
+		# тож спалах запускаємо на VISUAL_LEAD раніше, щоб побачити його разом з ударом.
+		var t := _music.get_playback_position() + AudioServer.get_time_since_last_mix() \
+			- AudioServer.get_output_latency() + VISUAL_LEAD
 		# Перемотали назад (трек з початку) — шукаємо місце заново.
-		if _beat_index > 0 and t < _beats[(_beat_index - 1) * 2] - 0.3:
+		if _beat_index > 0 and t < _beats[(_beat_index - 1) * 3] - 0.3:
 			_beat_index = _find_beat(t)
-		while _beat_index * 2 < _beats.size() and _beats[_beat_index * 2] <= t:
-			var strength := _beats[_beat_index * 2 + 1]
+		while _beat_index * 3 < _beats.size() and _beats[_beat_index * 3] <= t:
+			var strength := _beats[_beat_index * 3 + 1]
 			# Пропущені біти (лаг більше 0,2 с) не спалахують усі разом.
-			if t - _beats[_beat_index * 2] < 0.2:
+			if t - _beats[_beat_index * 3] < 0.2:
 				beat_pulse = maxf(beat_pulse, strength)
 				beat.emit(strength)
+				if _beats[_beat_index * 3 + 2] > 0.5 and strength > 0.3:
+					_start_wave(strength)
 			_beat_index += 1
-	# Музику вимкнено повзунком — і пульсації немає.
-	var visual := beat_pulse * beat_visuals * (1.0 if music_level > 0.001 else 0.0)
-	RenderingServer.global_shader_parameter_set(&"beat_pulse", visual)
+	# Музику вимкнено повзунком — і світлових ефектів немає.
+	var amount := beat_visuals if music_level > 0.001 else 0.0
+	RenderingServer.global_shader_parameter_set(&"beat_pulse", beat_pulse * amount)
+	RenderingServer.global_shader_parameter_set(&"beat_wave", Vector4(_wave_origin.x, _wave_origin.y, _wave_origin.z, _wave_time))
+	RenderingServer.global_shader_parameter_set(&"beat_wave_strength", _wave_strength * amount)
+	_update_spectrum(delta, amount)
+
+
+## Світлова хвиля від камери (гравця) по вікнах міста.
+func _start_wave(strength: float) -> void:
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return
+	_wave_origin = camera.global_position
+	_wave_time = 0.0
+	_wave_strength = clampf(strength * 1.2, 0.4, 1.0)
+
+
+## Живий спектр музики → 8 смуг 0..1 для будинків-«еквалайзерів».
+## Кожна смуга нормується за своїм середнім рівнем і недавнім піком — так стовпчики «живі»
+## і в тихих, і в гучних треках. Підйом швидкий, спад плавний.
+func _update_spectrum(delta: float, amount: float) -> void:
+	if _spectrum == null:
+		return
+	for i: int in SPECTRUM_BANDS.size() - 1:
+		var magnitude := _spectrum.get_magnitude_for_frequency_range(SPECTRUM_BANDS[i], SPECTRUM_BANDS[i + 1]).length()
+		var level := clampf((linear_to_db(maxf(magnitude, 0.00001)) + 70.0) / 60.0, 0.0, 1.0)
+		# Середній рівень смуги (~3 с) і недавній пік: стовпчик показує, наскільки зараз гучніше за звичне —
+		# у середньому ~третина висоти, на ударах і сплесках — до самого верху.
+		# На старті треку середнє одразу «підтягується» до рівня (інакше перші секунди стовпчики під стелею).
+		_band_mean[i] = lerpf(_band_mean[i], level, 1.0 - exp(-delta / (0.3 if level > _band_mean[i] + 0.15 else 3.0)))
+		_band_peak[i] = maxf(level, _band_peak[i] - delta * 0.05)
+		var span := maxf(_band_peak[i] - _band_mean[i], 0.04)
+		var value := clampf(0.2 + (level - _band_mean[i]) / span * 0.8, 0.0, 1.0) * clampf(level * 3.0, 0.0, 1.0)
+		var rate := 25.0 if value > _bands[i] else 9.0
+		_bands[i] = lerpf(_bands[i], value, 1.0 - exp(-rate * delta))
+	var on := amount if _music.playing else 0.0
+	RenderingServer.global_shader_parameter_set(&"music_bands_lo", Vector4(_bands[0], _bands[1], _bands[2], _bands[3]) * on)
+	RenderingServer.global_shader_parameter_set(&"music_bands_hi", Vector4(_bands[4], _bands[5], _bands[6], _bands[7]) * on)
 
 
 func _find_beat(t: float) -> int:
 	var i := 0
-	while i * 2 < _beats.size() and _beats[i * 2] < t:
+	while i * 3 < _beats.size() and _beats[i * 3] < t:
 		i += 1
 	return i
 
@@ -163,6 +220,17 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 ## Показати плашку «зараз грає» з поточним треком (наприклад, на старті гонки).
+func _add_spectrum_analyzer() -> void:
+	var bus := AudioServer.get_bus_index(&"Music")
+	if bus < 0:
+		return
+	var analyzer := AudioEffectSpectrumAnalyzer.new()
+	analyzer.buffer_length = 0.1
+	analyzer.fft_size = AudioEffectSpectrumAnalyzer.FFT_SIZE_1024
+	AudioServer.add_bus_effect(bus, analyzer)
+	_spectrum = AudioServer.get_bus_effect_instance(bus, AudioServer.get_bus_effect_count(bus) - 1) as AudioEffectSpectrumAnalyzerInstance
+
+
 func announce_current() -> void:
 	_now_playing.show_track(current_track)
 
