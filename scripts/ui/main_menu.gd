@@ -16,6 +16,8 @@ enum Screen { MAIN, RACER, MAP, TRACKS }
 @onready var _race_button: Button = $UI/MainPanel/Buttons/RaceButton
 @onready var _quit_button: Button = $UI/MainPanel/Buttons/QuitButton
 @onready var _tracks_button: Button = $UI/MainPanel/Buttons/TracksButton
+@onready var _settings_button: Button = $UI/MainPanel/Buttons/SettingsButton
+@onready var _settings: Control = $UI/SettingsPanel
 # Екран треків.
 @onready var _tracks_panel: Control = $UI/TracksPanel
 @onready var _tracks_counter: Label = $UI/TracksPanel/Counter
@@ -82,6 +84,8 @@ func _ready() -> void:
 	_map_index = maxi(Game.MAPS.find(Game.selected_map), 0)
 	_race_button.pressed.connect(_show_racer_screen)
 	_tracks_button.pressed.connect(_show_tracks_screen)
+	_settings_button.pressed.connect(_settings.open)
+	_settings.closed.connect(_settings_button.grab_focus)
 	_tracks_back_button.pressed.connect(_show_main)
 	_tracks_all_button.pressed.connect(_enable_all_tracks)
 	_tracks_all_button.focus_entered.connect(_on_track_buttons_focused)
@@ -99,7 +103,7 @@ func _ready() -> void:
 	_bots_prev.pressed.connect(_on_bots_arrow.bind(-1))
 	_bots_next.pressed.connect(_on_bots_arrow.bind(1))
 	_bots_row.gui_input.connect(_on_row_click.bind(_bots_row_index))
-	for button: Button in [_race_button, _tracks_button, _quit_button, _continue_button, _racer_back_button, _start_button, _map_back_button, _tracks_all_button, _tracks_back_button]:
+	for button: Button in [_race_button, _tracks_button, _settings_button, _quit_button, _continue_button, _racer_back_button, _start_button, _map_back_button, _tracks_all_button, _tracks_back_button]:
 		button.focus_entered.connect(Audio.play.bind(&"ui_move", -6.0))
 		button.pressed.connect(Audio.play.bind(&"ui_select", -3.0))
 	_continue_button.focus_entered.connect(_on_racer_buttons_focused)
@@ -139,6 +143,8 @@ func _process(delta: float) -> void:
 ## Екрани вибору керуємо тут (а не в _unhandled_input), щоб стрілки не перехоплювала
 ## стандартна навігація фокусу між кнопками. На рядку кнопок ←/→ і Enter лишаємо кнопкам.
 func _input(event: InputEvent) -> void:
+	if _settings.visible:
+		return   # вікно налаштувань керує собою саме
 	match _screen:
 		Screen.RACER:
 			_input_racer(event)

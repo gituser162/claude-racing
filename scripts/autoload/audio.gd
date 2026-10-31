@@ -78,8 +78,11 @@ const SETTINGS_PATH: String = "user://settings.cfg"
 ## Гучність шин 0..1 (налаштування гравця, зберігаються між запусками).
 var music_level: float = 0.8
 var sfx_level: float = 0.8
-## Сила візуальних ефектів під біт музики 0..1 (повзунок «ПУЛЬС»; 0 — вимкнено).
-var beat_visuals: float = 1.0
+## Налаштування світла під музику (вікно «НАЛАШТУВАННЯ»):
+## beat_lights — неон і екран спалахують під біт, світлова хвиля по вікнах на першій долі;
+## eq_buildings — будинки-«еквалайзери» (вікна-стовпчики за спектром).
+var beat_lights: bool = true
+var eq_buildings: bool = true
 
 ## Індекс треку, що грає зараз (у TRACKS), або -1.
 var current_track: int = -1
@@ -163,11 +166,12 @@ func _process(delta: float) -> void:
 					_start_wave(strength)
 			_beat_index += 1
 	# Музику вимкнено повзунком — і світлових ефектів немає.
-	var amount := beat_visuals if music_level > 0.001 else 0.0
-	RenderingServer.global_shader_parameter_set(&"beat_pulse", beat_pulse * amount)
+	var music_on := 1.0 if music_level > 0.001 else 0.0
+	var lights := music_on if beat_lights else 0.0
+	RenderingServer.global_shader_parameter_set(&"beat_pulse", beat_pulse * lights)
 	RenderingServer.global_shader_parameter_set(&"beat_wave", Vector4(_wave_origin.x, _wave_origin.y, _wave_origin.z, _wave_time))
-	RenderingServer.global_shader_parameter_set(&"beat_wave_strength", _wave_strength * amount)
-	_update_spectrum(delta, amount)
+	RenderingServer.global_shader_parameter_set(&"beat_wave_strength", _wave_strength * lights)
+	_update_spectrum(delta, music_on if eq_buildings else 0.0)
 
 
 ## Світлова хвиля від камери (гравця) по вікнах міста.
@@ -348,8 +352,13 @@ func set_music_level(level: float) -> void:
 	_save_settings()
 
 
-func set_beat_visuals(level: float) -> void:
-	beat_visuals = clampf(level, 0.0, 1.0)
+func set_beat_lights(enabled: bool) -> void:
+	beat_lights = enabled
+	_save_settings()
+
+
+func set_eq_buildings(enabled: bool) -> void:
+	eq_buildings = enabled
 	_save_settings()
 
 
@@ -372,7 +381,10 @@ func _load_settings() -> void:
 	if config.load(SETTINGS_PATH) == OK:
 		music_level = config.get_value("audio", "music", music_level)
 		sfx_level = config.get_value("audio", "sfx", sfx_level)
-		beat_visuals = config.get_value("audio", "beat_visuals", beat_visuals)
+		# Старий повзунок «ПУЛЬС» на нулі = обидва ефекти вимкнені.
+		var old_pulse: float = config.get_value("audio", "beat_visuals", 1.0)
+		beat_lights = config.get_value("visuals", "beat_lights", old_pulse > 0.001)
+		eq_buildings = config.get_value("visuals", "eq_buildings", old_pulse > 0.001)
 		for id: Variant in config.get_value("music", "disabled", []):
 			_disabled[StringName(str(id))] = true
 		# Хоч один трек має грати.
@@ -382,11 +394,16 @@ func _load_settings() -> void:
 	_apply_bus(&"SFX", sfx_level)
 
 
+## Зберігаємо поверх наявного файлу: у ньому ж налаштування екрана (Settings).
 func _save_settings() -> void:
 	var config := ConfigFile.new()
+	config.load(SETTINGS_PATH)
+	if config.has_section_key("audio", "beat_visuals"):
+		config.erase_section_key("audio", "beat_visuals")
 	config.set_value("audio", "music", music_level)
 	config.set_value("audio", "sfx", sfx_level)
-	config.set_value("audio", "beat_visuals", beat_visuals)
+	config.set_value("visuals", "beat_lights", beat_lights)
+	config.set_value("visuals", "eq_buildings", eq_buildings)
 	var disabled: PackedStringArray = []
 	for id: StringName in _disabled:
 		disabled.append(String(id))

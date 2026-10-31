@@ -6,15 +6,19 @@ const MENU_SCENE: String = "res://scenes/menu/main_menu.tscn"
 @onready var _continue_button: Button = $Panel/VBox/ContinueButton
 @onready var _restart_button: Button = $Panel/VBox/RestartButton
 @onready var _menu_button: Button = $Panel/VBox/MenuButton
+@onready var _settings_button: Button = $Panel/VBox/SettingsButton
+@onready var _settings: Control = $SettingsPanel
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	visible = false
-	for button: Button in [_continue_button, _restart_button, _menu_button]:
+	for button: Button in [_continue_button, _restart_button, _settings_button, _menu_button]:
 		button.focus_entered.connect(Audio.play.bind(&"ui_move", -6.0))
 		button.pressed.connect(Audio.play.bind(&"ui_select", -3.0))
 	_continue_button.pressed.connect(_resume)
+	_settings_button.pressed.connect(_settings.open)
+	_settings.closed.connect(_settings_button.grab_focus)
 	_restart_button.pressed.connect(func() -> void:
 		get_tree().paused = false
 		get_tree().reload_current_scene())
@@ -24,6 +28,8 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _settings.visible:
+		return
 	if event.is_action_pressed(&"pause"):
 		if visible:
 			_resume()

@@ -6,7 +6,7 @@
 [ext_resource type="Shader" path="res://resources/shaders/psx_glow.gdshader" id="90_glow"]
 [ext_resource type="Theme" path="res://resources/ui/neon_theme.tres" id="6_theme"]
 [ext_resource type="Shader" path="res://resources/shaders/psx.gdshader" id="7_psx"]
-[ext_resource type="Script" path="res://scripts/ui/volume_controls.gd" id="8_volume"]
+[ext_resource type="Script" path="res://scripts/ui/settings_panel.gd" id="8_settings"]
 [ext_resource type="Script" path="res://scripts/ui/music_controls.gd" id="9_music"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky"]
@@ -187,14 +187,13 @@ text = "ГОНКА"
 layout_mode = 2
 text = "ТРЕКИ"
 
+[node name="SettingsButton" type="Button" parent="UI/MainPanel/Buttons"]
+layout_mode = 2
+text = "НАЛАШТУВАННЯ"
+
 [node name="QuitButton" type="Button" parent="UI/MainPanel/Buttons"]
 layout_mode = 2
 text = "ВИХІД"
-
-[node name="Volume" type="VBoxContainer" parent="UI/MainPanel/Buttons"]
-layout_mode = 2
-theme_override_constants/separation = 4
-script = ExtResource("8_volume")
 
 [node name="Music" type="HBoxContainer" parent="UI/MainPanel/Buttons"]
 custom_minimum_size = Vector2(250, 0)
@@ -629,6 +628,15 @@ grow_vertical = 0
 theme_override_colors/font_color = Color(0.7, 0.7, 0.8, 1)
 theme_override_font_sizes/font_size = 10
 text = "↑/↓ вибір · Enter вкл/викл · → грати зараз · Esc назад"
+
+[node name="SettingsPanel" type="Control" parent="UI"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("8_settings")
 
 [node name="Rain" type="CPUParticles3D" parent="Camera3D"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9, -10)
