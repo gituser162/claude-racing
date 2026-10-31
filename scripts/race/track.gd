@@ -668,4 +668,7 @@ func _psx_material(albedo: Color, emission: Color = Color.BLACK, energy: float =
 	mat.set_shader_parameter(&"emission_energy", energy)
 	if not snap:
 		mat.set_shader_parameter(&"snap_grid", Vector2.ZERO)
+	# Кольоровий неон (не білі лампи) спалахує в такт музиці (global beat_pulse, див. Audio).
+	if energy >= 2.0 and emission.s > 0.35:
+		mat.set_shader_parameter(&"beat_react", 1.0)
 	return mat

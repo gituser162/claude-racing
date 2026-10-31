@@ -126,3 +126,7 @@ psx_detail={
 "type": "sampler2D",
 "value": "res://assets/textures/detail.png"
 }
+beat_pulse={
+"type": "float",
+"value": 0.0
+}

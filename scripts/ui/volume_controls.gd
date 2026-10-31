@@ -1,9 +1,11 @@
 extends VBoxContainer
-## Повзунки гучності «Музика» і «Ефекти». Вузол сам створює рядки й зберігає налаштування через Audio.
+## Повзунки гучності «Музика» і «Ефекти» та сили світлових ефектів під біт («Пульс»).
+## Вузол сам створює рядки й зберігає налаштування через Audio.
 
 func _ready() -> void:
 	_add_row("МУЗИКА", Audio.music_level, Audio.set_music_level)
 	_add_row("ЕФЕКТИ", Audio.sfx_level, Audio.set_sfx_level)
+	_add_row("ПУЛЬС", Audio.beat_visuals, Audio.set_beat_visuals)
 
 
 func _add_row(title: String, value: float, on_change: Callable) -> void:

@@ -8,6 +8,13 @@ extends Node
 ## Які треки грають — обирає гравець (екран «ТРЕКИ» в меню), вимкнені зберігаються в settings.cfg.
 
 signal track_changed(index: int)
+## Біт музики (сила 0..1) — у момент, коли він звучить. Візуальні ефекти беруть global beat_pulse.
+signal beat(strength: float)
+
+## Карти бітів треків (згенеровані tools/beat_analyze.py): id → [час, сила, …].
+const BEAT_MAPS := preload("res://scripts/autoload/beat_maps.gd")
+## Як швидко згасає спалах після біта (1/с): ~0,15 с до половини.
+const BEAT_DECAY: float = 7.0
 
 ## Треки: id (для налаштувань), виконавець, назва, файл і поправка гучності (дБ).
 ## Файли вантажаться лише перед відтворенням (load), щоб не тримати в пам'яті всі одразу.
@@ -67,6 +74,8 @@ const SETTINGS_PATH: String = "user://settings.cfg"
 ## Гучність шин 0..1 (налаштування гравця, зберігаються між запусками).
 var music_level: float = 0.8
 var sfx_level: float = 0.8
+## Сила візуальних ефектів під біт музики 0..1 (повзунок «ПУЛЬС»; 0 — вимкнено).
+var beat_visuals: float = 1.0
 
 ## Індекс треку, що грає зараз (у TRACKS), або -1.
 var current_track: int = -1
@@ -79,6 +88,11 @@ var _order: Array[int] = []
 var _order_pos: int = -1
 ## Плашка «зараз грає» (показується при зміні треку).
 var _now_playing: CanvasLayer
+## Біти поточного треку і наступний, що ще не прозвучав.
+var _beats: PackedFloat32Array = PackedFloat32Array()
+var _beat_index: int = 0
+## Поточний спалах під біт (0..1), згасає; іде в шейдери як global beat_pulse.
+var beat_pulse: float = 0.0
 var _rain: AudioStreamPlayer
 var _pool: Array[AudioStreamPlayer] = []
 var _pool_3d: Array[AudioStreamPlayer3D] = []
@@ -110,6 +124,33 @@ func _ready() -> void:
 		p.process_mode = Node.PROCESS_MODE_PAUSABLE
 		add_child(p)
 		_pool_3d.append(p)
+
+
+## Біти: порівнюємо позицію відтворення (з поправкою на затримку звуку) з картою бітів треку.
+func _process(delta: float) -> void:
+	beat_pulse *= exp(-BEAT_DECAY * delta)
+	if _music.playing and not _beats.is_empty():
+		var t := _music.get_playback_position() + AudioServer.get_time_since_last_mix() - AudioServer.get_output_latency()
+		# Перемотали назад (трек з початку) — шукаємо місце заново.
+		if _beat_index > 0 and t < _beats[(_beat_index - 1) * 2] - 0.3:
+			_beat_index = _find_beat(t)
+		while _beat_index * 2 < _beats.size() and _beats[_beat_index * 2] <= t:
+			var strength := _beats[_beat_index * 2 + 1]
+			# Пропущені біти (лаг більше 0,2 с) не спалахують усі разом.
+			if t - _beats[_beat_index * 2] < 0.2:
+				beat_pulse = maxf(beat_pulse, strength)
+				beat.emit(strength)
+			_beat_index += 1
+	# Музику вимкнено повзунком — і пульсації немає.
+	var visual := beat_pulse * beat_visuals * (1.0 if music_level > 0.001 else 0.0)
+	RenderingServer.global_shader_parameter_set(&"beat_pulse", visual)
+
+
+func _find_beat(t: float) -> int:
+	var i := 0
+	while i * 2 < _beats.size() and _beats[i * 2] < t:
+		i += 1
+	return i
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -168,8 +209,14 @@ func set_track_enabled(index: int, enabled: bool) -> bool:
 ## Наступний трек (за поточним випадковим порядком; коли всі прозвучали — новий порядок).
 func next_track() -> void:
 	if _order_pos + 1 >= _order.size():
-		_reshuffle(-1, current_track)
-		_play_order_pos(0)
+		# Новий випадковий порядок; попередній трек лишаємо перед ним, щоб «назад» повертав на нього.
+		var previous := current_track
+		_reshuffle(-1, previous)
+		if previous >= 0 and is_track_enabled(previous) and _order.size() > 1:
+			_order.push_front(previous)
+			_play_order_pos(1)
+		else:
+			_play_order_pos(0)
 	else:
 		_play_order_pos(_order_pos + 1)
 
@@ -178,6 +225,7 @@ func next_track() -> void:
 func prev_track() -> void:
 	if _music.playing and _music.get_playback_position() > 4.0:
 		_music.play(0.0)
+		_beat_index = 0
 		_now_playing.show_track(current_track)
 		return
 	_play_order_pos(posmod(_order_pos - 1, _order.size()))
@@ -216,6 +264,8 @@ func _play_order_pos(pos: int, announce: bool = true) -> void:
 		push_error("Музика: не вдалося завантажити %s" % track.path)
 		return
 	current_track = index
+	_beats = PackedFloat32Array(BEAT_MAPS.MAPS.get(track.id, []))
+	_beat_index = 0
 	_music.stream = stream
 	_music.volume_db = music_volume_db + float(track.gain_db)
 	_music.play()
@@ -227,6 +277,11 @@ func _play_order_pos(pos: int, announce: bool = true) -> void:
 func set_music_level(level: float) -> void:
 	music_level = clampf(level, 0.0, 1.0)
 	_apply_bus(&"Music", music_level)
+	_save_settings()
+
+
+func set_beat_visuals(level: float) -> void:
+	beat_visuals = clampf(level, 0.0, 1.0)
 	_save_settings()
 
 
@@ -249,6 +304,7 @@ func _load_settings() -> void:
 	if config.load(SETTINGS_PATH) == OK:
 		music_level = config.get_value("audio", "music", music_level)
 		sfx_level = config.get_value("audio", "sfx", sfx_level)
+		beat_visuals = config.get_value("audio", "beat_visuals", beat_visuals)
 		for id: Variant in config.get_value("music", "disabled", []):
 			_disabled[StringName(str(id))] = true
 		# Хоч один трек має грати.
@@ -262,6 +318,7 @@ func _save_settings() -> void:
 	var config := ConfigFile.new()
 	config.set_value("audio", "music", music_level)
 	config.set_value("audio", "sfx", sfx_level)
+	config.set_value("audio", "beat_visuals", beat_visuals)
 	var disabled: PackedStringArray = []
 	for id: StringName in _disabled:
 		disabled.append(String(id))

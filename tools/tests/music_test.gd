@@ -15,9 +15,10 @@ func _initialize() -> void:
 		saved.append(audio.is_track_enabled(i))
 	for i in audio.track_count():
 		audio.set_track_enabled(i, true)
-	# Вперед: за 12 перемикань — усі треки без повторів.
-	var seen := {}
-	for i in audio.track_count():
+	# Вперед: за одне «коло» плейлиста — усі треки без повторів.
+	audio.play_track(0)
+	var seen := {audio.current_track: true}
+	for i in audio.track_count() - 1:
 		audio.next_track()
 		seen[audio.current_track] = true
 	print("вперед: різних треків %d з %d" % [seen.size(), audio.track_count()])

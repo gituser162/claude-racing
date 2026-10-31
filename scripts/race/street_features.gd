@@ -198,6 +198,7 @@ func _build_plaza() -> void:
 	ring_mat.set_shader_parameter(&"color", Color(0.2, 0.9, 1.0))
 	ring_mat.set_shader_parameter(&"intensity", 2.0)
 	ring_mat.set_shader_parameter(&"rim", false)
+	ring_mat.set_shader_parameter(&"beat_react", 1.0)
 	ring.material_override = ring_mat
 	ring.position.y = 1.65
 	holder.add_child(ring)

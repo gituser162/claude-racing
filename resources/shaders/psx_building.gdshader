@@ -16,6 +16,8 @@ uniform float texel_density = 4.0;
 uniform vec2 snap_grid = vec2(0.0);
 // Рівень землі: нижче ground_y + 1,5 м вікон немає (цоколь). Для міст нижче нуля (вежа «Спіраль») — висота їхньої землі.
 uniform float ground_y = 0.0;
+// Біт музики (ставить Audio): неонові (блакитні й рожеві) вікна спалахують у такт.
+global uniform float beat_pulse;
 
 varying vec3 world_pos;
 varying vec3 world_normal;
@@ -62,6 +64,7 @@ void fragment() {
 		float glow = (0.55 + 0.45 * hash(cell * 3.1)) * blinds * (1.0 - 0.75 * curtain);
 		glow *= 0.85 + 0.3 * hash(wp + cell);
 		ALBEDO = mix(wall * (1.0 + 0.8 * frame), vec3(0.02, 0.025, 0.035), in_window);
-		EMISSION = tint * in_window * lit * window_energy * glow;
+		float neon_window = step(0.8, seed);
+		EMISSION = tint * in_window * lit * window_energy * glow * (1.0 + neon_window * (beat_pulse * 2.0 - 0.3));
 	}
 }

@@ -89,6 +89,7 @@ func _build_tower() -> void:
 	torus.ring_segments = 4
 	ring.mesh = torus
 	ring.material_override = _glow(Color(1.0, 0.2, 0.75), 2.0)
+	(ring.material_override as ShaderMaterial).set_shader_parameter(&"beat_react", 1.0)
 	ring.position = Vector3(tower_center.x, top - 0.6, tower_center.y)
 	holder.add_child(ring)
 

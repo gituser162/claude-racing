@@ -20,6 +20,9 @@ uniform vec2 snap_grid = vec2(0.0);
 uniform float affine_strength = 0.0;
 
 global uniform sampler2D psx_detail : filter_nearest_mipmap, repeat_enable;
+// Пульс під біт музики (0..1, ставить Audio) і наскільки цей матеріал на нього реагує (неон — 1).
+global uniform float beat_pulse;
+uniform float beat_react = 0.0;
 // «Сітчаста» прозорість (0 — звичайний, 1 — невидимий): частина пікселів відкидається
 // за шаблоном Баєра, як на старих консолях. Напр. машина, що закриває камері гравця
 // (див. Car.set_see_through — машина отримує власні копії матеріалів).
@@ -59,7 +62,8 @@ void fragment() {
 		color *= mix(vec3(1.0), d, detail_strength);
 	}
 	ALBEDO = color;
-	EMISSION = emission.rgb * emission_energy;
+	// Неон «дихає» з музикою: між бітами трохи тьмяніший, на біті — яскравий спалах.
+	EMISSION = emission.rgb * emission_energy * (1.0 + beat_react * (beat_pulse * 1.6 - 0.3));
 	ROUGHNESS = roughness;
 	SPECULAR = 0.35;
 }

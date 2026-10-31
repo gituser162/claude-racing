@@ -174,10 +174,10 @@ text = "мемні перегони нічним містом"
 [node name="Buttons" type="VBoxContainer" parent="UI/MainPanel"]
 layout_mode = 0
 offset_left = 34.0
-offset_top = 150.0
+offset_top = 138.0
 offset_right = 214.0
 offset_bottom = 280.0
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
 [node name="RaceButton" type="Button" parent="UI/MainPanel/Buttons"]
 layout_mode = 2

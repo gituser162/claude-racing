@@ -17,7 +17,7 @@
 | Що | Де | Примітка |
 |---|---|---|
 | Глобальний стан | `scripts/autoload/game.gd` (Game) | `RACER_PATHS`/`RACERS`, `MAP_PATHS`/`MAPS`, `selected_racer`, `selected_map`, `bot_count` (1..6), `swap_in_selected_map()` |
-| Звук | `scripts/autoload/audio.gd` (Audio) | словник `SFX`, шини Music/SFX, гучність і вимкнені треки в `user://settings.cfg`; плейлист `TRACKS` (load перед відтворенням), `next_track`/`prev_track`/`play_track`/`set_track_enabled`, сигнал `track_changed`; плашка `scripts/ui/now_playing.gd`, рядок меню/паузи `scripts/ui/music_controls.gd`; дії `music_prev`/`music_next` ([ / ]) |
+| Звук | `scripts/autoload/audio.gd` (Audio) | словник `SFX`, шини Music/SFX, гучність і вимкнені треки в `user://settings.cfg`; плейлист `TRACKS` (load перед відтворенням), `next_track`/`prev_track`/`play_track`/`set_track_enabled`, сигнали `track_changed`, `beat(strength)`; біти — `beat_maps.gd` (генерує `tools/beat_analyze.py`), пульс → global shader uniform `beat_pulse` (шейдери `psx` з `beat_react`, `psx_glow` з `beat_react`, `psx_building`, `hologram`, `post_psx`), повзунок «ПУЛЬС» = `beat_visuals`; плашка `scripts/ui/now_playing.gd`, рядок меню/паузи `scripts/ui/music_controls.gd`; дії `music_prev`/`music_next` ([ / ]) |
 | Гонка | `scenes/main.tscn` + `scripts/main.gd` | фази, чекпоінти, місця, HUD, результати, прозорість машин, що закривають огляд (`_update_see_through`), динаміка (`RaceDynamics`) |
 | Машина | `scenes/car/car.tscn` + `scripts/car/car.gd` (Car) | фізика — куля RigidBody (r 0,5) + видимий Body (top_level); курс `_heading`; занос (`drift_*`), бар'єри (`_check_barriers` контуром кузова), розворот біля стіни (`_swinging`, `_reverse_sliding`), фари, дим, іскри, `race_speed_multiplier` |
 | Динаміка гонки | `scripts/race/race_dynamics.gd` | множники макс. швидкості відносно гравця: зграя, хаос, наздоганяння |
@@ -48,6 +48,8 @@
 - **Перед експортом після синхронізації uid** — видалити `.godot/exported`, інакше в збірці попередження про недійсні uid.
 - **Меню:** `set_input_as_handled()` викликати до зміни сцени (після — меню вже не в дереві).
 - **Траса, що проходить над собою:** `CSGPolygon3D` з `PATH_ROTATION_PATH_FOLLOW` на спіралі накопичує крен (рамка без обертання) — дорога перекручується. Для таких трас `path_rotation = PATH` (переріз завжди горизонтальний). `Curve3D.get_closest_offset` — у 3D, тож на сусідніх витках (≥ 11 м) машина «чіпляється» до свого.
+- **`const X = PackedFloat32Array([...])` — не константний вираз** у GDScript: великі таблиці (карти бітів) — звичайні масиви в `const`, перетворення в Packed — під час виконання. `const S: GDScript = preload(...)` втрачає члени скрипта — писати `const S := preload(...)`.
+- **`RenderingServer.global_shader_parameter_get` у headless зависає** — у тестах читати значення з коду (Audio.beat_pulse).
 - **Не замкнена траса:** `fposmod(offset, length)` перекидає кінець на початок — для спринту всі офсети через `Track.wrap_offset`/`signed_gap`; `CSGPolygon3D.path_joined = false`. Машина, що стоїть на самому краю кривої, скочується з плити — сітка має бути повністю на дорозі.
 - **Вікна в `psx_building.gdshader`** — лише вище `ground_y + 1,5 м` (цоколь); для міста на землі нижче нуля задати `ground_y`.
 - **Мережа середовища Claude:** github raw/api закриті; `git clone` працює; шаблони експорту качаються діапазонами з release-assets.
